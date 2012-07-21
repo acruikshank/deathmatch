@@ -1,0 +1,271 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>design</title>
+  <meta name="author" content="sivoh">
+  <style type="text/css">
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #000; color:#fff;}
+      #player                 { display:block; float: left; margin-right: 20px; width:600px;  }
+      #header                 { padding-left: 30px; }
+      #header span            { display:inline-block; width: 40px; text-align: center; }
+      #drop:hover             { cursor:pointer; }
+
+  </style>
+  <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script language="javascript">
+     var   b2Vec2 = Box2D.Common.Math.b2Vec2
+      , dyn = Box2D.Dynamics, shapes = Box2D.Collision.Shapes, joints = dyn.Joints
+      , b2BodyDef = dyn.b2BodyDef
+      , b2Body = dyn.b2Body
+      , b2FixtureDef = dyn.b2FixtureDef
+      , b2Fixture = dyn.b2Fixture
+      , b2FilterData = dyn.b2FilterData
+      , b2World = dyn.b2World
+      , b2MassData = shapes.b2MassData
+      , b2PolygonShape = shapes.b2PolygonShape
+      , b2CircleShape = shapes.b2CircleShape
+      , b2RevoluteJointDef = joints.b2RevoluteJointDef
+      , b2DebugDraw = dyn.b2DebugDraw ;
+
+    var DAMAGE_FACTOR = 15;
+
+    var ITERATIONS = 30000;
+    var BOTTOM = 590;
+    var BULLET = { x:200, y:300, vx:0, vy:0, genome: 
+[{"obl":0.505, "giv":0.705, "ext":0.500, "tak":1.000, "ang":0.265, "flx":0.605, "chd":[1,1,1]},
+ {"obl":0.530, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":1.000, "chd":[2,6,2]},
+ {"obl":0.995, "giv":0.000, "ext":1.000, "tak":0.990, "ang":0.500, "flx":0.040, "chd":[3,2,3]}]
+
+        }
+    var TARGET = { x:600, y:300, vx:0, vy:0, genome : 
+[{"obl":0.505, "giv":0.820, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1,1,1,1]},
+ {"obl":0.200, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.042, "chd":[3,6,3]}]
+     }
+
+
+/*
+MERCE
+[{"obl":0.505, "giv":0.705, "ext":0.500, "tak":1.000, "ang":0.265, "flx":0.605, "chd":[1,1,1]},
+ {"obl":0.530, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":1.000, "chd":[2,6,2]},
+ {"obl":0.995, "giv":0.000, "ext":1.000, "tak":0.990, "ang":0.500, "flx":0.040, "chd":[3,2,3]}]
+
+
+CLOWN
+[{"obl":0.505, "giv":0.795, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1]},
+ {"obl":0.360, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.960, "chd":[3,6,3]}]
+
+ROVER
+[{"obl":0.505, "giv":0.820, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1,1,1,1]},
+ {"obl":0.200, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.042, "chd":[3,6,3]}]
+
+SYRING
+[{"obl":0.505, "giv":0.950, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1]},
+ {"obl":0.360, "giv":0.800, "ext":0.000, "tak":1.000, "ang":1.000, "flx":1.000, "chd":[2,6,2]},
+ {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.225, "ang":0.500, "flx":0.500, "chd":[3,3,3]}]
+*/
+
+
+    /*
+     DAMAGE:
+       register a contact listener
+       on contact, examine the contact manifold.
+       The part with the normal face will be dented.
+       Determine the sharpness of the other part as a function of its number of sides, oblong 
+        and the angle between the normal and the parts rotation angle.
+     */
+
+    var world, bullet, target;
+
+    function el(id) { return document.getElementById(id); }
+    function childOf(el,clss) { if (! el || el.tagName == 'BODY') return null; return (el.getAttribute('class') === clss ? el : childOf(el.parentNode,clss)); }
+    function offset(el) { if ( el.tagName === 'BODY' ) return {left:0, top:0}; var o = offset(el.offsetParent); return {left:o.left+el.offsetLeft, top:o.top+el.offsetTop}; }
+
+    function draw() {
+      var ctx = el('display').getContext('2d');
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,10,10,.3)';
+      ctx.strokeStyle = 'rgb(200,200,200)';
+
+      ctx.restore();
+    }
+
+    function eachChild( part, f, arg1, arg2 ) {
+      if (part.children) 
+        for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
+          if (child) f( child, arg1, arg2 );
+    }
+
+    function initDebugDraw( ctx ) {
+      var debugDraw = new b2DebugDraw();
+      ctx.save();
+      debugDraw.SetSprite(ctx);
+      debugDraw.SetDrawScale( 1/deathmatch.PIXELS_PER_METER );
+      debugDraw.SetFillAlpha(0.3);
+      debugDraw.SetLineThickness(1.0);
+      debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
+      world.SetDebugDraw(debugDraw);
+      ctx.restore();
+    }
+
+    function statbox( bodyDef, fixDef, x, y, w, h ) {
+      bodyDef.type = b2Body.b2_staticBody;
+      bodyDef.position.x = x;
+      bodyDef.position.y = y;
+      bodyDef.angle = 0;
+
+      fixDef.shape = new b2PolygonShape.AsBox( w, h );
+      var body = world.CreateBody(bodyDef)
+      body.CreateFixture(fixDef);
+      return body;
+    }
+
+    function drawDamage( part, ctx, left ) {
+      var s = deathmatch.PIXELS_PER_METER;
+      ctx.save();
+      ctx.scale( 1/s, 1/s );
+      ctx.lineWidth = s;
+//      ctx.lineWidth = 1/deathmatch.PIXELS_PER_METER;
+      ctx.beginPath();
+      ctx.arc( part.origin.x, part.origin.y, .4*part.mass*s, 0, 2*Math.PI, true );
+      ctx.fillStyle = left ? '#00f' : '#f00';
+      ctx.fill();
+      ctx.fillStyle = ctx.strokeStyle = '#fff'; 
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc( part.origin.x, part.origin.y, .4*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
+      ctx.fill(); i
+      ctx.restore();
+      eachChild( part, drawDamage, ctx, left );
+    }
+
+    function junkify( part, index ) {
+      part.body.id = null;
+      var filterData = new b2FilterData();
+      filterData.groupIndex = -index;
+      part.body.m_fixtureList.SetFilterData(filterData);
+      part.junk = true;
+
+      var transform = new deathmatch.T().scale(.5,.5);
+      for ( var i=0, points = part.body.m_fixtureList.m_shape.m_vertices, v; v = points[i]; i++ ) {
+        var p = transform.project(v);
+        points[i] = new b2Vec2(p.x,p.y);
+      }
+
+      if ( part.attachment && part.attachment.SetMotorSpeed ) {
+        part.attachment.SetMotorSpeed( 0 );
+        part.attachment.SetMaxMotorTorque( 0 );
+      }
+
+      eachChild( part, junkify, index );
+    }
+
+    var junkIndex = 3;
+    function assessDamage( part ) {
+      if ( part.health.instant_integrity <= 0 ) {
+        if ( part.parent ) {
+          world.DestroyJoint( part.attachment );
+          part.attachment = null;
+          delete part.parent.children[part.index];
+          junkify( part, junkIndex++ );
+        } else {
+          clearInterval(interval);
+        }
+      }
+      eachChild( part, assessDamage );
+    }
+
+    var count = 0, joint;
+    function physicsUpdate() {
+      world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
+      deathmatch.updateCreature( bullet );
+      assessDamage( bullet );
+
+      deathmatch.updateCreature( target );
+      assessDamage( target );
+
+
+      world.DrawDebugData();
+
+      var ctx = el('display').getContext('2d');
+      drawDamage( bullet, ctx, true );
+      drawDamage( target, ctx, false );
+
+      world.ClearForces();
+      count++
+    }
+
+    function jointTest() {
+      var s = deathmatch.PIXELS_PER_METER;
+      world = new b2World( new b2Vec2(0, 10),  false );
+
+      var fixDef = new b2FixtureDef;
+      fixDef.density = .5;
+      fixDef.friction = 1;
+      fixDef.restitution = 0.2;
+
+      var bodyDef = new b2BodyDef;
+      bodyDef.angularDamping = 4;
+
+      //create cage
+      var bottom  = statbox( bodyDef, fixDef, 0, (BOTTOM-10)*s, 800.0*s, 20*s);
+      bottom.SetAngle( .1 );
+      var bottom  = statbox( bodyDef, fixDef, 0, (BOTTOM + 70)*s, 800.0*s, 20*s);
+      bottom.SetAngle( -.1 );
+      statbox( bodyDef, fixDef, 0, BOTTOM*s/2, 20*s, 1000.0*s);
+      statbox( bodyDef, fixDef, 800*s, BOTTOM*s/2, 20*s, 1000.0*s);
+
+      var transform = new deathmatch.T().translate( TARGET.x*s, (BOTTOM - TARGET.y)*s );
+      target = deathmatch.generate( TARGET.genome, transform, true );
+      target.name = 'target';
+      deathmatch.addPhysics( target, world, 1 );
+
+      var transform = new deathmatch.T().translate( BULLET.x*s, (BOTTOM - BULLET.y)*s );
+      bullet  = deathmatch.generate( BULLET.genome, transform, false );
+      bullet.name = 'bullet';
+      deathmatch.addPhysics( bullet, world, 2 );
+
+      initDebugDraw(el('display').getContext('2d'));
+    }
+
+    var interval;
+    var count = 0;
+    function startPhysics() {
+      interval = setInterval(function(){
+        count++;
+        if (count > ITERATIONS) clearInterval(interval); 
+        physicsUpdate(); 
+      }, 1000/60);
+    }
+
+    function init() {
+      jointTest();
+      physicsUpdate();
+      startPhysics();
+    }
+
+    document.onkeypress = function(e) { 
+      if (e.keyCode == 32) {
+        if ( interval ) {
+          clearInterval(interval); 
+          interval = null;
+        }
+        else startPhysics();
+      }
+    }
+
+  </script>
+</head>
+<body onload="init()">
+<div id="player">
+  <canvas id="display" width="1000" height="600"></canvas>
+</div>
+</body>
+</html>
