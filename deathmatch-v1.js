@@ -48,6 +48,8 @@ var deathmatch = (function() {
   var MAX_OBLIQUE = 5;
   var DENSITY = .01;
   var PIXELS_PER_METER = .01;
+  var DAMAGE_FACTOR = 20;
+  var JUNK_DAMAGE_FACTOR = 10;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
   var MAX_DRIVER_SPEED = 10, MIN_DRIVER_SPEED = .5;
@@ -56,7 +58,7 @@ var deathmatch = (function() {
 
   var fixture_index = 10;
 
-  var   b2Vec2 = Box2D.Common.Math.b2Vec2
+  var b2Vec2 = Box2D.Common.Math.b2Vec2
     , dyn = Box2D.Dynamics, shapes = Box2D.Collision.Shapes, joints = dyn.Joints
     , b2BodyDef = dyn.b2BodyDef
     , b2Body = dyn.b2Body
@@ -70,6 +72,12 @@ var deathmatch = (function() {
     , b2RevoluteJointDef = joints.b2RevoluteJointDef
     , b2WeldJointDef = joints.b2WeldJointDef
 
+  var FIXTURE_DEF = new b2FixtureDef;
+  FIXTURE_DEF.density = 1.0;
+  FIXTURE_DEF.friction = 0.5;
+  FIXTURE_DEF.restitution = 0.2;
+
+  var junk = {}, junkIndex = 3;
 
   var ta = {};
   ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
@@ -112,6 +120,29 @@ var deathmatch = (function() {
   function radius_for_mass( mass, sides ) {
     var angle = 2 * Math.PI / sides;
     return Math.sqrt( 2 * mass / (DENSITY * sides * Math.sin( angle ) ) );
+  }
+
+  function boundedExponential( x, min, max ) {
+    return min * Math.exp( Math.log(max / min) * x );
+  }
+
+  function blowDamage( blow, part ) { return (part.junk?JUNK_DAMAGE_FACTOR:DAMAGE_FACTOR) * (blow||0) / part.mass; }
+
+  function closestPoint( vec, points ) {
+    var min = 0, min_dist = Math.abs(vec.x-points[0].x) + Math.abs(vec.y-points[0].y), dist;
+    for ( var i=1, point; point = points[i]; i++ ) {
+      dist = Math.abs(vec.x-point.x) + Math.abs(vec.y-point.y);
+      if (dist < min_dist) min = i, min_dist = dist;
+    }
+    return min;
+  }
+
+  function abs_dot( v1, v2 ) { return Math.abs(v1.x * v2.x + v1.y * v2.y); }
+
+  function eachChild( part, f, arg1, arg2 ) {
+    if (part.children) 
+      for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
+        if (child) f( child, arg1, arg2 );
   }
 
   function generate( genome, transform, leftFacing ) {
@@ -205,10 +236,6 @@ var deathmatch = (function() {
   }
 
   function addPhysics( creature, world, group ) {
-    var fixDef = new b2FixtureDef;
-    fixDef.density = 1.0;
-    fixDef.friction = 0.5;
-    fixDef.restitution = 0.2;
 
     var bodyDef = new b2BodyDef;
     bodyDef.angularDamping = ANGULAR_DAMPING;
@@ -229,24 +256,24 @@ var deathmatch = (function() {
         points.push( new b2Vec2(point.x,point.y) );
         t.rotate( 2*half_angle );
       }
-      fixDef.filter.groupIndex = -group;
-      fixDef.shape = new b2PolygonShape.AsArray( points, points.length );
+      FIXTURE_DEF.filter.groupIndex = -group;
+      FIXTURE_DEF.shape = new b2PolygonShape.AsArray( points, points.length );
 
       part.body = world.CreateBody(bodyDef)
       part.body.id = fixture_index++;
       part.body.part = part;
 
-      part.body.CreateFixture(fixDef);
+      part.body.CreateFixture(FIXTURE_DEF);
 
       if (part.children) for (var i=0,child; child=part.children[i],i<part.sides; i++) {
         if ( child ) {
           addPart(child);
-          creature.joints.push( addJoint(part, child, points[i], creature.leftFacing ) );
+          creature.joints.push( addJoint(part, child, points[i], creature.leftFacing, world ) );
         }
       }
     })(creature);
 
-    var listener = {
+    world.SetContactListener({
       BeginContact: function(contact) {
         if ( ! contact.m_fixtureA.m_body.id || ! contact.m_fixtureB.m_body.id ) return;
       },
@@ -254,25 +281,32 @@ var deathmatch = (function() {
         if ( ! contact.m_fixtureA.m_body.id || ! contact.m_fixtureB.m_body.id ) return;
         var partA = contact.m_fixtureA.m_body.part;
         var partB = contact.m_fixtureB.m_body.part;
-        partA.health.integrity -= blowDamage(partA.health.blows[partB.body.id], partA);
-        delete partA.health.blows[partB.body.id];
-        partB.health.integrity -= blowDamage(partB.health.blows[partA.body.id], partB);
-        delete partB.health.blows[partA.body.id];
+
+        var blow = partA.health.blows[partB.body.id];
+        if ( blow ) {
+          partA.health.integrity -= blowDamage(blow.damage, partA);
+          if ( partA.junk )
+            partA.resize = blow;
+          delete partA.health.blows[partB.body.id];
+        }
+
+        blow = partB.health.blows[partA.body.id];
+        if ( blow ) {
+          partB.health.integrity -= blowDamage(blow.damage, partB);
+          if ( partB.junk )
+            partB.resize = blow;
+          delete partB.health.blows[partA.body.id];
+        }
       },
       PreSolve: function() {},
       PostSolve: function(contact, impulse) { 
         if ( ! contact.m_fixtureA.m_body.id || ! contact.m_fixtureB.m_body.id ) return;
         applyDamage(contact,impulse) 
       }
-    }
-    world.SetContactListener(listener);
+    });
   }
 
-  function boundedExponential( x, min, max ) {
-    return min * Math.exp( Math.log(max / min) * x );
-  }
-
-  function addJoint( parent, child, point, leftFacing ) {
+  function addJoint( parent, child, point, leftFacing, world ) {
     var type, jointDef, sym_flex = Math.abs(child.flex - .5), constant;
     if ( sym_flex >= .3 ) {
       type = 'driver'
@@ -329,10 +363,10 @@ var deathmatch = (function() {
     part.origin.x = pos.x;
     part.origin.y = pos.y;
     part.theta = part.body.GetAngle();
-    if ( part.children ) for (var i=0,child; child=part.children[i],i<part.sides; i++) if (child) updatePart(child);
+    eachChild( part, updatePart );
   }
 
-  function updateCreature( creature ) {
+  function updateCreature( creature, world ) {
     updatePart(creature);
     for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
       if ( joint.type === 'flex' ) {
@@ -340,28 +374,69 @@ var deathmatch = (function() {
         joint.joint.SetMaxMotorTorque( Math.abs(joint.joint.GetJointAngle() * joint.constant) );
       }
     }
-    computeDamage( creature );
+    assessDamage( creature, world );
   }
 
-  function computeDamage( part ) {
-    var totalBlows = 0, health = part.health;
-    for ( var id in health.blows ) totalBlows += health.blows[id]
-    health.instant_integrity = health.integrity - blowDamage( totalBlows, part );
-    eachChild( part, computeDamage );
-  }
+  function assessDamage( part, world ) {
+    var totalDamage = 0, health = part.health;
+    for ( var id in health.blows ) totalDamage += health.blows[id].damage
+    health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
 
-  function blowDamage( blow, part ) { return DAMAGE_FACTOR * (blow||0) / part.mass; }
-
-  function closestPoint( vec, points ) {
-    var min = 0, min_dist = Math.abs(vec.x-points[0].x) + Math.abs(vec.y-points[0].y), dist;
-    for ( var i=1, point; point = points[i]; i++ ) {
-      dist = Math.abs(vec.x-point.x) + Math.abs(vec.y-point.y);
-      if (dist < min_dist) min = i, min_dist = dist;
+    if ( part.health.instant_integrity <= 0 ) {
+      junkify( part, world );
     }
-    return min;
+
+    eachChild( part, assessDamage, world );
   }
 
-  function abs_dot( v1, v2 ) { return Math.abs(v1.x * v2.x + v1.y * v2.y); }
+  function junkify( part, world ) {
+    var filterData = new b2FilterData();
+    filterData.groupIndex = 0;
+    part.body.m_fixtureList.SetFilterData(filterData);
+    part.junk = true;
+    junk[part.body.id] = part;
+    part.health.integrity = 1;
+
+    if (part.parent) { 
+      world.DestroyJoint( part.attachment );
+      part.attachment = null;
+      delete part.parent.children[part.index];
+      part.parent = null;
+    }
+
+    eachChild( part, junkify, world );
+  }
+
+  function updateJunk( world ) {
+    for ( var id in junk ) {
+      var part = junk[id];
+      if ( part.health.integrity < 0 ) {
+        world.DestroyBody(part.body);
+        delete junk[id];
+      } else if ( part.resize ) {
+        resizeJunk( part, part.resize, world );
+        part.resize = null;
+      }
+    }
+  }
+
+  function resizeJunk( part, blow, world ) {
+    var angle = Math.atan2(blow.normal.y, blow.normal.x);
+    var scale = part.health.integrity / (part.health.integrity + blowDamage(blow.damage,part) );
+    var transform = new deathmatch.T().rotate(-angle).scale(scale,1).rotate(angle);
+
+    var points = part.body.m_fixtureList.m_shape.m_vertices;
+    for ( var i=0, v; v = points[i]; i++ ) {
+      var p = transform.project(v);
+      points[i] = new b2Vec2(p.x,p.y);
+    }
+    FIXTURE_DEF.filter.groupIndex = 0;
+    FIXTURE_DEF.shape = new b2PolygonShape.AsArray( points, points.length );
+    part.body.DestroyFixture(part.body.m_fixtureList);
+    part.body.CreateFixture(FIXTURE_DEF);
+
+    part.body.ResetMassData();
+  }
 
   function applyDamage( contact, impulse ) {
     if ( ! contact.m_fixtureA.m_body.part || ! contact.m_fixtureB.m_body.part ||
@@ -397,13 +472,17 @@ var deathmatch = (function() {
     var sharp_factor = Math.min(abs_dot(impulseNorm,side1), abs_dot(impulseNorm,side2));
     sharp_factor *= sharp_factor;
 
-    // We store the damage as a blow. The blow will permenently subtracted from the part's
-    // health once contact has ended.  We keep the maximum damage reported over the
+    // We store the damage as a blow. The blow will be permenently subtracted from the part's
+    // health once contact has ended.  We store the maximum damage reported over the
     // period of contact.
     var damage = (impulse.normalImpulses[0] + impulse.normalImpulses[1]) * sharp_factor;
-    var blow = defender.part.health.blows[attacker.id] || 0;
-    if ( damage > blow )
-      defender.part.health.blows[attacker.id] = damage;
+    if (damage == 0)
+      return false;
+    var blows = defender.part.health.blows, blow = blows[attacker.id] = blows[attacker.id] || {damage:0};
+    if ( damage > blow.damage ) {
+      blow.damage = damage;
+      blow.normal = impulseNorm;
+    }
     return true;
   }
 
@@ -412,6 +491,7 @@ var deathmatch = (function() {
     generate: generate,
     addPhysics: addPhysics,
     updateCreature: updateCreature,
+    updateJunk: updateJunk,
     T: T,
     PIXELS_PER_METER : PIXELS_PER_METER
   }

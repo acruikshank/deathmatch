@@ -17,6 +17,7 @@
   <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
   <script language="javascript">
+function init() {
      var   b2Vec2 = Box2D.Common.Math.b2Vec2
       , dyn = Box2D.Dynamics, shapes = Box2D.Collision.Shapes, joints = dyn.Joints
       , b2BodyDef = dyn.b2BodyDef
@@ -36,14 +37,14 @@
     var ITERATIONS = 30000;
     var BOTTOM = 590;
     var BULLET = { x:200, y:300, vx:0, vy:0, genome: 
-[{"obl":0.505, "giv":0.705, "ext":0.500, "tak":1.000, "ang":0.265, "flx":0.605, "chd":[1,1,1]},
- {"obl":0.530, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":1.000, "chd":[2,6,2]},
- {"obl":0.995, "giv":0.000, "ext":1.000, "tak":0.990, "ang":0.500, "flx":0.040, "chd":[3,2,3]}]
+[{"obl":0.505, "giv":0.820, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1,1,1,1]},
+ {"obl":0.200, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.042, "chd":[3,6,3]}]
 
         }
     var TARGET = { x:600, y:300, vx:0, vy:0, genome : 
-[{"obl":0.505, "giv":0.820, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1,1,1,1]},
- {"obl":0.200, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.042, "chd":[3,6,3]}]
+[{"obl":0.505, "giv":0.950, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1]},
+ {"obl":0.360, "giv":0.800, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.005, "chd":[2,6,2]},
+ {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.225, "ang":0.500, "flx":0.500, "chd":[3,3,3]}]
      }
 
 
@@ -68,15 +69,13 @@ SYRING
  {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.225, "ang":0.500, "flx":0.500, "chd":[3,3,3]}]
 */
 
-
-    /*
-     DAMAGE:
-       register a contact listener
-       on contact, examine the contact manifold.
-       The part with the normal face will be dented.
-       Determine the sharpness of the other part as a function of its number of sides, oblong 
-        and the angle between the normal and the parts rotation angle.
-     */
+/*
+TODO:
+Store all junk pieces
+Evaluate damage on all junk pieces.
+Reshape junk on collision exit.
+Remove junk after sufficient damage.
+*/
 
     var world, bullet, target;
 
@@ -94,12 +93,6 @@ SYRING
       ctx.strokeStyle = 'rgb(200,200,200)';
 
       ctx.restore();
-    }
-
-    function eachChild( part, f, arg1, arg2 ) {
-      if (part.children) 
-        for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
-          if (child) f( child, arg1, arg2 );
     }
 
     function initDebugDraw( ctx ) {
@@ -126,6 +119,12 @@ SYRING
       return body;
     }
 
+    function eachChild( part, f, arg1, arg2 ) {
+      if (part.children) 
+        for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
+          if (child) f( child, arg1, arg2 );
+    }
+
     function drawDamage( part, ctx, left ) {
       var s = deathmatch.PIXELS_PER_METER;
       ctx.save();
@@ -146,51 +145,14 @@ SYRING
       eachChild( part, drawDamage, ctx, left );
     }
 
-    function junkify( part, index ) {
-      part.body.id = null;
-      var filterData = new b2FilterData();
-      filterData.groupIndex = -index;
-      part.body.m_fixtureList.SetFilterData(filterData);
-      part.junk = true;
-
-      var transform = new deathmatch.T().scale(.5,.5);
-      for ( var i=0, points = part.body.m_fixtureList.m_shape.m_vertices, v; v = points[i]; i++ ) {
-        var p = transform.project(v);
-        points[i] = new b2Vec2(p.x,p.y);
-      }
-
-      if ( part.attachment && part.attachment.SetMotorSpeed ) {
-        part.attachment.SetMotorSpeed( 0 );
-        part.attachment.SetMaxMotorTorque( 0 );
-      }
-
-      eachChild( part, junkify, index );
-    }
-
-    var junkIndex = 3;
-    function assessDamage( part ) {
-      if ( part.health.instant_integrity <= 0 ) {
-        if ( part.parent ) {
-          world.DestroyJoint( part.attachment );
-          part.attachment = null;
-          delete part.parent.children[part.index];
-          junkify( part, junkIndex++ );
-        } else {
-          clearInterval(interval);
-        }
-      }
-      eachChild( part, assessDamage );
-    }
 
     var count = 0, joint;
     function physicsUpdate() {
       world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
-      deathmatch.updateCreature( bullet );
-      assessDamage( bullet );
 
-      deathmatch.updateCreature( target );
-      assessDamage( target );
-
+      deathmatch.updateCreature( bullet, world );
+      deathmatch.updateCreature( target, world );
+      deathmatch.updateJunk( world );
 
       world.DrawDebugData();
 
@@ -200,6 +162,10 @@ SYRING
 
       world.ClearForces();
       count++
+
+      if ( bullet.junk || target.junk ) {
+        clearInterval(interval);
+      }
     }
 
     function jointTest() {
@@ -245,12 +211,6 @@ SYRING
       }, 1000/60);
     }
 
-    function init() {
-      jointTest();
-      physicsUpdate();
-      startPhysics();
-    }
-
     document.onkeypress = function(e) { 
       if (e.keyCode == 32) {
         if ( interval ) {
@@ -261,6 +221,10 @@ SYRING
       }
     }
 
+  jointTest();
+  physicsUpdate();
+  startPhysics();
+}
   </script>
 </head>
 <body onload="init()">
