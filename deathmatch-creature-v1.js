@@ -4,7 +4,6 @@ deathmatch.creature = (function() {
   var MIN_PART_MASS = .51;
   var MAX_OBLIQUE = 5;
   var DENSITY = .01;
-  var PIXELS_PER_METER = .01;
 	
   var ta = {};
   ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
@@ -49,7 +48,7 @@ deathmatch.creature = (function() {
     return Math.sqrt( 2 * mass / (DENSITY * sides * Math.sin( angle ) ) );
   }
 
-  function generate( genome, transform, leftFacing ) {
+  function generate( genome, transform, leftFacing, PIXELS_PER_METER ) {
     var direction = leftFacing ? -1 : 1;
     transform.scale(1,-1);
     var creature = { type:0, mass:MASS, transform:new T(transform.t), genome:genome, joints:[], leftFacing:leftFacing };
@@ -141,7 +140,6 @@ deathmatch.creature = (function() {
 
   return {
     generate: generate,
-    PIXELS_PER_METER : PIXELS_PER_METER,
     T: T
   }
 })()

@@ -1,5 +1,7 @@
 deathmatch = (window.deathmatch || {});
 deathmatch.contest = (function() {
+  var PIXELS_PER_METER = .01;
+
   var DAMAGE_FACTOR = 20;
   var JUNK_DAMAGE_FACTOR = 10;
 
@@ -9,7 +11,15 @@ deathmatch.contest = (function() {
   var ANGULAR_DAMPING = 4;
 
   var CAGE_WIDTH = 800, CAGE_MARGIN = 10;
-  var BOTTOM = 500, DROP_HEIGHT = 300, LEFT_DROP_X = 200, RIGHT_DROP_X = CAGE_WIDTH - LEFT_DROP_X;
+  var CAGE_BOTTOM = 500, DROP_HEIGHT = 300, LEFT_DROP_X = 200, RIGHT_DROP_X = CAGE_WIDTH - LEFT_DROP_X;
+  var cageParameters =  {
+    CAGE_WIDTH : CAGE_WIDTH,
+    CAGE_MARGIN : CAGE_MARGIN,
+    CAGE_BOTTOM : CAGE_BOTTOM,
+    sideCageIntercept : 0,
+    centerCageIntercept : 0
+  };
+
 
   var fixture_index = 10;
 
@@ -64,19 +74,19 @@ deathmatch.contest = (function() {
   }
 
   function startMatch( leftGenome, rightGenome ) {
-    var s = deathmatch.creature.PIXELS_PER_METER;
+    var s = PIXELS_PER_METER;
     world = new b2World( new b2Vec2(0, 10),  false );
     floorSlope = (.5  + Math.random()) / 10;
 
     generateCage();
 
-    var transform = new deathmatch.creature.T().translate( LEFT_DROP_X*s, (BOTTOM - DROP_HEIGHT)*s );
-    leftCreature = deathmatch.creature.generate( leftGenome, transform, true );
+    var transform = new deathmatch.creature.T().translate( LEFT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
+    leftCreature = deathmatch.creature.generate( leftGenome, transform, true, PIXELS_PER_METER );
     leftCreature.name = 'left';
     addPhysics( leftCreature, 1 );
 
-    transform = new deathmatch.creature.T().translate( RIGHT_DROP_X*s, (BOTTOM - DROP_HEIGHT)*s );
-    rightCreature  = deathmatch.creature.generate( rightGenome, transform, false );
+    transform = new deathmatch.creature.T().translate( RIGHT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
+    rightCreature  = deathmatch.creature.generate( rightGenome, transform, false, PIXELS_PER_METER );
     rightCreature.name = 'right';
     addPhysics( rightCreature, 2 );
 
@@ -94,23 +104,23 @@ deathmatch.contest = (function() {
   }
 
   function generateCage() {
-    var bottom  = statbox( 0, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    var bottom  = statbox( 0, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
     bottom.SetAngle( floorSlope );
-    var bottom  = statbox( CAGE_WIDTH/2-CAGE_MARGIN, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    var bottom  = statbox( CAGE_WIDTH/2-CAGE_MARGIN, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
     bottom.SetAngle( -floorSlope );
 
-    statbox( 0, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
-    statbox( CAGE_WIDTH-CAGE_MARGIN, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
+    statbox( 0, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
+    statbox( CAGE_WIDTH-CAGE_MARGIN, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
 
-    var x0 = (CAGE_WIDTH/2 + CAGE_MARGIN)/2, y0 = BOTTOM-3*CAGE_MARGIN;
+    var x0 = (CAGE_WIDTH/2 + CAGE_MARGIN)/2, y0 = CAGE_BOTTOM-3*CAGE_MARGIN;
     var y1 = y0 + CAGE_MARGIN * floorSlope * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
     var x1 = x0 + CAGE_MARGIN * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
-    sideCageIntercept = y1 - (x1 - CAGE_MARGIN) * floorSlope;
-    centerCageIntercept = y1 - (x1 - CAGE_WIDTH / 2) * floorSlope;
+    cageParameters.sideCageIntercept = y1 - (x1 - CAGE_MARGIN) * floorSlope;
+    cageParameters.centerCageIntercept = y1 - (x1 - CAGE_WIDTH / 2) * floorSlope;
   }
 
   function statbox( x, y, w, h ) {
-    var s = deathmatch.creature.PIXELS_PER_METER;
+    var s = PIXELS_PER_METER;
     CAGE_BODY_DEF.type = b2Body.b2_staticBody;
     CAGE_BODY_DEF.position.x = (x + w/2)*s;
     CAGE_BODY_DEF.position.y = (y + h/2)*s;
@@ -138,7 +148,7 @@ deathmatch.contest = (function() {
       var t = new deathmatch.creature.T().scale(part.oblong,1/part.oblong);
       t.rotate(Math.PI+half_angle);
       for (var i=0; i < part.sides; i++) {
-        var point = t.project({x:0, y:part.r * deathmatch.creature.PIXELS_PER_METER});
+        var point = t.project({x:0, y:part.r * PIXELS_PER_METER});
         points.push( new b2Vec2(point.x,point.y) );
         t.rotate( 2*half_angle );
       }
@@ -215,83 +225,6 @@ deathmatch.contest = (function() {
     }
     child.attachment = world.CreateJoint(jointDef);
     return {joint:child.attachment, constant:constant, type:type}
-  }
-
-  function render( part, ctx, genome ) {
-    var s = deathmatch.creature.PIXELS_PER_METER;
-
-    genome = genome || part.genome;
-    var type = genome[part.type], sides = type.chd.length, half_angle = Math.PI / sides;
-
-    ctx.save();
-    ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = s;
-    ctx.translate( part.origin.x, part.origin.y );
-    ctx.rotate( part.theta );
-    ctx.scale( part.oblong, 1 / part.oblong );
-
-    ctx.beginPath();
-    ctx.rotate(Math.PI+half_angle);
-    ctx.moveTo( 0, part.r * s );
-    for (var i=0; i < sides; i++) {
-      ctx.rotate( 2*half_angle );
-      ctx.lineTo( 0, part.r * s );
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    if (part.children) {
-      for ( var i=0,c=part.children,l=c.length,child; child=c[i], i<l; i++ ) {
-        if (child) render( child, ctx, genome );
-      }
-    }
-  }
-
-  function renderCage( ctx ) {
-    ctx.save();
-//    ctx.scale(deathmatch.creature.PIXELS_PER_METER*10, deathmatch.creature.PIXELS_PER_METER*10);
-    ctx.beginPath()
-    ctx.moveTo( -CAGE_MARGIN, -20 );
-    ctx.lineTo( CAGE_MARGIN, -20 );
-    ctx.lineTo( CAGE_MARGIN, sideCageIntercept );
-    ctx.lineTo( CAGE_WIDTH / 2, centerCageIntercept );
-    ctx.lineTo( CAGE_WIDTH - CAGE_MARGIN, sideCageIntercept );
-    ctx.lineTo( CAGE_WIDTH - CAGE_MARGIN, -20 );
-    ctx.lineTo( CAGE_WIDTH + CAGE_MARGIN, -20 );
-    ctx.lineTo( CAGE_WIDTH + CAGE_MARGIN, BOTTOM+20 );
-    ctx.lineTo( - CAGE_MARGIN, BOTTOM+20 );
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // ctx.fillRect( 0, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
-    // ctx.fillRect( CAGE_WIDTH/2-CAGE_MARGIN, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
-    // var intercept = {x:CAGE_MARGIN/2, y:};
-    // ctx.fillRect( 0, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
-    // ctx.fillRect( CAGE_WIDTH-CAGE_MARGIN, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
-    ctx.restore();
-  }
-
-  function renderJunk( part, ctx ) {
-    var s = deathmatch.creature.PIXELS_PER_METER;
-    var points = part.body.m_fixtureList.m_shape.m_vertices;
-
-    ctx.save();
-    ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = s;
-    var pos = part.body.GetPosition();
-    ctx.translate( pos.x, pos.y );
-    ctx.rotate( part.body.GetAngle() );
-
-    ctx.beginPath();
-    ctx.moveTo( points[0].x, points[0].y );
-    for (var i=1; i < points.length; i++)
-      ctx.lineTo( points[i].x, points[i].y );
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
   }
 
   function updateCreature( creature ) {
@@ -422,11 +355,10 @@ deathmatch.contest = (function() {
   }
 
   return {
+    PIXELS_PER_METER : PIXELS_PER_METER,
+    cageParameters : cageParameters,
     startMatch : startMatch,
     updateMatch : updateMatch,
-    render: render,
-    renderCage : renderCage,
-    renderJunk: renderJunk,
     addPhysics: addPhysics,
     updateCreature: updateCreature,
     updateJunk: updateJunk,

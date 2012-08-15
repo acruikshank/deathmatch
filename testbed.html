@@ -4,7 +4,7 @@
 <html lang="en">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>design</title>
+  <title>test</title>
   <meta name="author" content="sivoh">
   <style type="text/css">
       body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%;}
@@ -15,8 +15,9 @@
 
   </style>
   <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
-  <script type="text/javascript" src="creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
   <script language="javascript">
 function init() {
      var   b2Vec2 = Box2D.Common.Math.b2Vec2
@@ -106,31 +107,6 @@ Remove junk after sufficient damage.
       ctx.restore();
     }
 
-    function eachChild( part, f, arg1, arg2 ) {
-      if (part.children) 
-        for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
-          if (child) f( child, arg1, arg2 );
-    }
-
-    function drawDamage( part, ctx, left ) {
-      var s = deathmatch.creature.PIXELS_PER_METER;
-      ctx.save();
-      ctx.scale( 1/s, 1/s );
-      ctx.lineWidth = s;
-      ctx.beginPath();
-      ctx.arc( part.origin.x, part.origin.y, .4*part.mass*s, 0, 2*Math.PI, true );
-      ctx.fillStyle = left ? '#00f' : '#0d0';
-      ctx.fill();
-      ctx.fillStyle = ctx.strokeStyle = '#fff'; 
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc( part.origin.x, part.origin.y, .4*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
-      ctx.fill(); i
-      ctx.restore();
-      eachChild( part, drawDamage, ctx, left );
-    }
-
 
     var count = 0, joint;
     function physicsUpdate() {
@@ -138,38 +114,11 @@ Remove junk after sufficient damage.
 
       var ctx = el('display').getContext('2d');
 
-      ctx.fillStyle = 'rgba(52,82,122,.3)';
+      ctx.fillStyle = 'rgba(52,82,122,.4)';
       ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
 
 //      deathmatch.contest.world().DrawDebugData();
-
-      ctx.save();
-      ctx.lineWidth = deathmatch.PIXELS_PER_METER;
-
-      ctx.scale(1/deathmatch.PIXELS_PER_METER, 1/deathmatch.PIXELS_PER_METER);
-
-      ctx.fillStyle = 'rgba(40,40,40,.3)';
-      ctx.strokeStyle = '#666';
-      var junk = deathmatch.contest.junk();
-      for ( var id in junk )
-        deathmatch.contest.renderJunk( junk[id], ctx );
-
-      ctx.fillStyle = 'rgba(0,0,0,.12)';
-      ctx.strokeStyle = 'rgba(255,255,255,.65)';
-      if ( ! deathmatch.contest.rightCreature().junk )
-        deathmatch.contest.render( deathmatch.contest.rightCreature(), ctx );
-      if ( ! deathmatch.contest.leftCreature().junk ) 
-        deathmatch.contest.render( deathmatch.contest.leftCreature(), ctx );
-      if ( ! deathmatch.contest.leftCreature().junk ) 
-        drawDamage( deathmatch.contest.leftCreature(), ctx, true );
-      if ( ! deathmatch.contest.rightCreature().junk )
-        drawDamage( deathmatch.contest.rightCreature(), ctx, false );
-
-      ctx.fillStyle = '#ccc';
-      ctx.strokeStyle = '#000';
-      deathmatch.contest.renderCage(ctx);
-      ctx.restore();
-
+      deathmatch.render.renderCanvas(ctx);
 
       count++
 
@@ -178,10 +127,10 @@ Remove junk after sufficient damage.
       }
     }
 
-    function jointTest() {
+    function startMatch() {
       deathmatch.contest.startMatch( TARGET.genome, BULLET.genome );
  
-      initDebugDraw(el('display').getContext('2d'), deathmatch.contest.world() );
+//      initDebugDraw(el('display').getContext('2d'), deathmatch.contest.world() );
     }
 
     var interval;
@@ -204,8 +153,7 @@ Remove junk after sufficient damage.
       }
     }
 
-  jointTest();
-  physicsUpdate();
+  startMatch();
   startPhysics();
 }
   </script>
