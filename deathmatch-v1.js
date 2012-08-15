@@ -1,53 +1,5 @@
-/*
-   parameters:
-     obliqness
-     extension
-     take
-     give
-     angl(e|ular velocity)
-     flex|torque
-     descendants
-
-   area of regular polygon as function of radius:
-     triangle: 3**cos(30)*r^2/2
-     square: 2 r^2
-     pentagon: 5*cos(PI/5)*sin(PI/5)*r^2
-     n-gon: n*cos(PI/n)*sin(PI/n)*r^2 = n*sin(2*PI/n)*r^2/2
-     given an area a: r = sqrt( 2*a / (n*sin(2*PI/n)) )
-
-  oblong can be used wihtout affecting area by using a scale transform:
-    scale( f(oblong), 1/f(oblong) )
-    f must map 0-1 such that f(.5) = 1 and f(x) = 1/f(1-x).
-    f(0) and f(1) should probably finite and tunable.
-    f = exp( A * (.5-x) )
-    if A = ln(N), then the width can be at most N times the height and vice versa.
-    f = exp( ln(N) * (.5-x) )
-
-  extension should map 0-1 to a y translation s.t. the part remains touching it's origini (after oblong).
-    extension = t(0)*obl = -r*cos(half_angle), t(1)*obl = sides%2==0 ? r*cos(half_angle) : r.
-
-  generating to conserve mass
-    function create_part( part_def, mass )
-      part = create_part(part_def)
-      total_child_mass = min( mass * (1-give), mass - MIN_MASS )
-      child_defs = [create_def(point) for points in part_def]
-      child_def_group = group child_defs by take
-      sort child_def_groups by take (ascending)
-      total_take = sum(child_def_group.take * child_def_group.length for child_def_group in child_def_groups)
-      for child_def_group in child_def_groups
-        child_mass = total_child_mass * child_def_group.take / total_take
-        if child_mass >= MIN_MASS
-          for child_def in child_def_group
-            part.children.push( create_part[child_def], child_mass )
-        else
-          total_take -= child_def_group.take * child_def_group.length
- */
-var deathmatch = (function() {
-  var MASS = 100;
-  var MIN_PART_MASS = .51;
-  var MAX_OBLIQUE = 5;
-  var DENSITY = .01;
-  var PIXELS_PER_METER = .01;
+deathmatch = (window.deathmatch || {});
+deathmatch.contest = (function() {
   var DAMAGE_FACTOR = 20;
   var JUNK_DAMAGE_FACTOR = 10;
 
@@ -55,6 +7,9 @@ var deathmatch = (function() {
   var MAX_DRIVER_SPEED = 10, MIN_DRIVER_SPEED = .5;
   var MAX_DRIVER_TORQUE = 1000, MIN_DRIVER_TORQUE = 100000000;
   var ANGULAR_DAMPING = 4;
+
+  var CAGE_WIDTH = 800, CAGE_MARGIN = 10;
+  var BOTTOM = 500, DROP_HEIGHT = 300, LEFT_DROP_X = 200, RIGHT_DROP_X = CAGE_WIDTH - LEFT_DROP_X;
 
   var fixture_index = 10;
 
@@ -77,55 +32,18 @@ var deathmatch = (function() {
   FIXTURE_DEF.friction = 0.5;
   FIXTURE_DEF.restitution = 0.2;
 
-  var junk = {}, junkIndex = 3;
+  var CAGE_FIXTURE_DEF = new b2FixtureDef;
+  CAGE_FIXTURE_DEF.density = .5;
+  CAGE_FIXTURE_DEF.friction = 1;
+  CAGE_FIXTURE_DEF.restitution = 0.2;
 
-  var ta = {};
-  ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
-  ta.multiply=function(t2,t1){ return {a:t1.a*t2.a+t1.b*t2.c, c:t1.c*t2.a+t1.d*t2.c, 
-                                       b:t1.a*t2.b+t1.b*t2.d, d:t1.c*t2.b+t1.d*t2.d, 
-                                       e:t1.e*t2.a+t1.f*t2.c+t2.e, f:t1.e*t2.b+t1.f*t2.d+t2.f}; };
-  ta.translate=function(x,y) { return {a:1,b:0,c:0,d:1,e:x,f:y}; };
-  ta.rotate= function(theta) { return {a:Math.cos(theta), b:Math.sin(theta),
-                                       c:-Math.sin(theta),d:Math.cos(theta),e:0,f:0}; }
-  ta.scale=    function(x,y) { return {a:x,b:0,c:0,d:y,e:0,f:0}; }
-  ta.ident=       function() { return {a:1,b:0,c:0,d:1,e:0,f:0}; }
-  ta.clone=      function(t) { return {a:t.a,b:t.b,c:t.c,d:t.d,e:t.e,f:t.f}; }
-  ta.inverse=    function(t) { var det=t.a*t.d-t.c*t.b; return {a:t.d/det, b:-t.b/det, c:-t.c/det,
-                               d:t.a/det, e:(t.c*t.f-t.e*t.d)/det, f:(t.e*t.b-t.a*t.f)/det}; }
-                               var ci=0;
-  ta.apply=  function(ctx,t) { ctx.setTransform(t.a,t.b,t.c,t.d,t.e,t.f); }
+  var CAGE_BODY_DEF = new b2BodyDef;
+  CAGE_BODY_DEF.angularDamping = 4;
 
-  function T(transform) { this.t = transform || ta.ident(), public={}; }
-  T.prototype = { 
-    project:function(p) {return ta.project(p,this.t);},
-    clone:function() { return new T(ta.clone(this.t)); },
-    inverse:function() { return new T(ta.inverse(this.t)); },
-    multiply:function(transform) { this.t = ta.multiply(this.t,transform.t); return this; },
-    translate:function(x,y) { this.t = ta.multiply(this.t, ta.translate(x,y)); return this; },
-    rotate:function(theta) { this.t = ta.multiply(this.t, ta.rotate(theta)); return this; },
-    scale:function(x,y) { this.t = ta.multiply(this.t, ta.scale(x,y)); return this; },
-    apply:function(ctx) { ta.apply(ctx,this.t); return this; }
-  }
+  var junk = {}, world, leftCreature, rightCreature, floorSlope = .15;
+  var sideCageIntercept, centerCageIntercept;
 
-
-  function obliqueness( oblong ) {
-    return Math.exp( Math.log(MAX_OBLIQUE) * (.5-oblong) );
-  }
-
-  function extension( ext, r, sides ) {
-    var half_angle = Math.PI/sides, min = sides % 2 ? -r : -r*Math.cos(half_angle), max = r*Math.cos(half_angle);
-    return min + (max - min)*ext;
-  }
-
-  function radius_for_mass( mass, sides ) {
-    var angle = 2 * Math.PI / sides;
-    return Math.sqrt( 2 * mass / (DENSITY * sides * Math.sin( angle ) ) );
-  }
-
-  function boundedExponential( x, min, max ) {
-    return min * Math.exp( Math.log(max / min) * x );
-  }
-
+  function boundedExponential( x, min, max ) { return min * Math.exp( Math.log(max / min) * x ); }
   function blowDamage( blow, part ) { return (part.junk?JUNK_DAMAGE_FACTOR:DAMAGE_FACTOR) * (blow||0) / part.mass; }
 
   function closestPoint( vec, points ) {
@@ -145,98 +63,66 @@ var deathmatch = (function() {
         if (child) f( child, arg1, arg2 );
   }
 
-  function generate( genome, transform, leftFacing ) {
-    var direction = leftFacing ? -1 : 1;
-    transform.scale(1,-1);
-    var creature = { type:0, mass:MASS, transform:new T(transform.t), genome:genome, joints:[], leftFacing:leftFacing };
-    var generation = [ creature ];
-    var next_generation;
-    creature.transform.scale( PIXELS_PER_METER, PIXELS_PER_METER );
+  function startMatch( leftGenome, rightGenome ) {
+    var s = deathmatch.creature.PIXELS_PER_METER;
+    world = new b2World( new b2Vec2(0, 10),  false );
+    floorSlope = (.5  + Math.random()) / 10;
 
-    while ( generation.length > 0 ) {
-      next_generation = [];
-      for ( var i=0,l=generation.length,part; part = generation[i], i<l; i++ ) {
-        if ( ! part ) continue;
+    generateCage();
 
-        var type = genome[part.type];
-        var mass_to_give = part.mass - Math.max( part.mass * (1-type.giv), MIN_PART_MASS );
+    var transform = new deathmatch.creature.T().translate( LEFT_DROP_X*s, (BOTTOM - DROP_HEIGHT)*s );
+    leftCreature = deathmatch.creature.generate( leftGenome, transform, true );
+    leftCreature.name = 'left';
+    addPhysics( leftCreature, 1 );
 
-        var tak_groups = {}
-        var total_take = 0;
-        var child_masses = [];
-        for ( var j=0,l2=type.chd.length; j<l2; chd_type=j++ ) {
-          var child_type = genome[type.chd[j]];
-          if ( child_type ) {
-            total_take += child_type.tak;
-            (tak_groups[child_type.tak] = tak_groups[child_type.tak] || []).push({index:j,tak:child_type.tak});
-          }
-        }
-        var tak_group_list = []; for (var take in tak_groups) tak_group_list.push(tak_groups[take]);
-        tak_group_list.sort(function(a,b) {return a[0].tak - b[0].tak;})
-        var first_tak_group = 0;
-        for (var k=0,tak_group; tak_group=tak_group_list[k]; k++) {
-          var child_mass = mass_to_give * tak_group[0].tak / total_take;
-          if ( child_mass >= MIN_PART_MASS ) {
-            for (var j=0,tge; tge = tak_group[j]; j++) child_masses[tge.index] = child_mass;
-            part.mass -= child_mass * tak_group.length;
-          } else {
-            total_take -= tak_group[0].tak * tak_group.length;
-          }
-        }
+    transform = new deathmatch.creature.T().translate( RIGHT_DROP_X*s, (BOTTOM - DROP_HEIGHT)*s );
+    rightCreature  = deathmatch.creature.generate( rightGenome, transform, false );
+    rightCreature.name = 'right';
+    addPhysics( rightCreature, 2 );
 
-        part.r = radius_for_mass( part.mass, type.chd.length );
-
-        var obl = obliqueness( type.obl );
-        var ext = extension( type.ext, part.r, type.chd.length ) / obl;
-        part.transform.rotate(direction * Math.PI*(2*type.ang-1));
-        part.transform.translate( 0, ext );
-
-        part.origin = part.transform.project({x:0,y:0});
-
-        var half_angle = Math.PI / type.chd.length;
-        var work_transform = part.transform.clone().scale(1/obl,obl);
-        var point = work_transform.project({x:part.r,y:0}), 
-            dx = point.x-part.origin.x, dy = point.y-part.origin.y;
-        part.theta = Math.atan2(dy,dx);
-        work_transform.rotate(Math.PI+half_angle);
-
-        for ( var j=0,l2=type.chd.length; j<l2; chd_type=j++ ) {
-          var child_type = genome[type.chd[j]];
-          if ( child_type && child_masses[j] ) {
-
-            point = work_transform.project({x:part.r/PIXELS_PER_METER,y:0}); 
-            dx = point.x-part.origin.x; dy = point.y-part.origin.y;
-            var child_transform = part.transform.clone().rotate(
-              Math.atan2(dy,dx)-part.theta).translate(0,Math.sqrt(dx*dx+dy*dy));
-
-            part.children = part.children || [];
-            part.children[j] = {
-                parent: part,
-                index: j,
-                type: type.chd[j],
-                mass: child_masses[j],
-                transform: child_transform };
-          }
-          work_transform.rotate( 2 * half_angle);
-        }
-
-        part.oblong = obl;
-        part.flex = type.flx;
-        part.theta += Math.PI;
-        part.sides = type.chd.length;
-        part.transform.scale( obl, 1/obl );
-        part.health = { integrity:1, instant_integrity:1, blows:{} };
-
-        if ( part.children ) next_generation = next_generation.concat( part.children );
-      }
-      generation = next_generation;
-    }
-
-    return creature;
+    return world;
   }
 
-  function addPhysics( creature, world, group ) {
+  function updateMatch() {
+    world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
 
+    deathmatch.contest.updateCreature( leftCreature );
+    deathmatch.contest.updateCreature( rightCreature );
+    deathmatch.contest.updateJunk( );
+
+    world.ClearForces();    
+  }
+
+  function generateCage() {
+    var bottom  = statbox( 0, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    bottom.SetAngle( floorSlope );
+    var bottom  = statbox( CAGE_WIDTH/2-CAGE_MARGIN, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    bottom.SetAngle( -floorSlope );
+
+    statbox( 0, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
+    statbox( CAGE_WIDTH-CAGE_MARGIN, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
+
+    var x0 = (CAGE_WIDTH/2 + CAGE_MARGIN)/2, y0 = BOTTOM-3*CAGE_MARGIN;
+    var y1 = y0 + CAGE_MARGIN * floorSlope * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
+    var x1 = x0 + CAGE_MARGIN * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
+    sideCageIntercept = y1 - (x1 - CAGE_MARGIN) * floorSlope;
+    centerCageIntercept = y1 - (x1 - CAGE_WIDTH / 2) * floorSlope;
+  }
+
+  function statbox( x, y, w, h ) {
+    var s = deathmatch.creature.PIXELS_PER_METER;
+    CAGE_BODY_DEF.type = b2Body.b2_staticBody;
+    CAGE_BODY_DEF.position.x = (x + w/2)*s;
+    CAGE_BODY_DEF.position.y = (y + h/2)*s;
+    CAGE_BODY_DEF.angle = 0;
+
+    CAGE_FIXTURE_DEF.shape = new b2PolygonShape.AsBox( w*s/2, h*s/2 );
+    var body = world.CreateBody(CAGE_BODY_DEF)
+    body.CreateFixture(CAGE_FIXTURE_DEF);
+    return body;
+  }
+
+  function addPhysics( creature, group ) {
     var bodyDef = new b2BodyDef;
     bodyDef.angularDamping = ANGULAR_DAMPING;
 
@@ -249,10 +135,10 @@ var deathmatch = (function() {
 
       var points = [];
       var half_angle = Math.PI / part.sides;
-      var t = new T().scale(part.oblong,1/part.oblong);
+      var t = new deathmatch.creature.T().scale(part.oblong,1/part.oblong);
       t.rotate(Math.PI+half_angle);
       for (var i=0; i < part.sides; i++) {
-        var point = t.project({x:0, y:part.r * PIXELS_PER_METER});
+        var point = t.project({x:0, y:part.r * deathmatch.creature.PIXELS_PER_METER});
         points.push( new b2Vec2(point.x,point.y) );
         t.rotate( 2*half_angle );
       }
@@ -268,7 +154,7 @@ var deathmatch = (function() {
       if (part.children) for (var i=0,child; child=part.children[i],i<part.sides; i++) {
         if ( child ) {
           addPart(child);
-          creature.joints.push( addJoint(part, child, points[i], creature.leftFacing, world ) );
+          creature.joints.push( addJoint(part, child, points[i], creature.leftFacing ) );
         }
       }
     })(creature);
@@ -306,7 +192,7 @@ var deathmatch = (function() {
     });
   }
 
-  function addJoint( parent, child, point, leftFacing, world ) {
+  function addJoint( parent, child, point, leftFacing ) {
     var type, jointDef, sym_flex = Math.abs(child.flex - .5), constant;
     if ( sym_flex >= .3 ) {
       type = 'driver'
@@ -332,30 +218,91 @@ var deathmatch = (function() {
   }
 
   function render( part, ctx, genome ) {
+    var s = deathmatch.creature.PIXELS_PER_METER;
+
     genome = genome || part.genome;
     var type = genome[part.type], sides = type.chd.length, half_angle = Math.PI / sides;
 
     ctx.save();
+    ctx.scale( 1/s, 1/s );
+    ctx.lineWidth = s;
     ctx.translate( part.origin.x, part.origin.y );
     ctx.rotate( part.theta );
     ctx.scale( part.oblong, 1 / part.oblong );
 
     ctx.beginPath();
     ctx.rotate(Math.PI+half_angle);
-    ctx.moveTo( 0, part.r * PIXELS_PER_METER );
+    ctx.moveTo( 0, part.r * s );
     for (var i=0; i < sides; i++) {
       ctx.rotate( 2*half_angle );
-      ctx.lineTo( 0, part.r * PIXELS_PER_METER );
+      ctx.lineTo( 0, part.r * s );
     }
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 
-    if (part.children)
+    if (part.children) {
       for ( var i=0,c=part.children,l=c.length,child; child=c[i], i<l; i++ ) {
         if (child) render( child, ctx, genome );
       }
+    }
+  }
+
+  function renderCage( ctx ) {
+    ctx.save();
+//    ctx.scale(deathmatch.creature.PIXELS_PER_METER*10, deathmatch.creature.PIXELS_PER_METER*10);
+    ctx.beginPath()
+    ctx.moveTo( -CAGE_MARGIN, -20 );
+    ctx.lineTo( CAGE_MARGIN, -20 );
+    ctx.lineTo( CAGE_MARGIN, sideCageIntercept );
+    ctx.lineTo( CAGE_WIDTH / 2, centerCageIntercept );
+    ctx.lineTo( CAGE_WIDTH - CAGE_MARGIN, sideCageIntercept );
+    ctx.lineTo( CAGE_WIDTH - CAGE_MARGIN, -20 );
+    ctx.lineTo( CAGE_WIDTH + CAGE_MARGIN, -20 );
+    ctx.lineTo( CAGE_WIDTH + CAGE_MARGIN, BOTTOM+20 );
+    ctx.lineTo( - CAGE_MARGIN, BOTTOM+20 );
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // ctx.fillRect( 0, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    // ctx.fillRect( CAGE_WIDTH/2-CAGE_MARGIN, BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    // var intercept = {x:CAGE_MARGIN/2, y:};
+    // ctx.fillRect( 0, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
+    // ctx.fillRect( CAGE_WIDTH-CAGE_MARGIN, -BOTTOM, CAGE_MARGIN, 4*BOTTOM);
+    ctx.restore();
+  }
+
+  function renderJunk( part, ctx ) {
+    var s = deathmatch.creature.PIXELS_PER_METER;
+    var points = part.body.m_fixtureList.m_shape.m_vertices;
+
+    ctx.save();
+    ctx.scale( 1/s, 1/s );
+    ctx.lineWidth = s;
+    var pos = part.body.GetPosition();
+    ctx.translate( pos.x, pos.y );
+    ctx.rotate( part.body.GetAngle() );
+
+    ctx.beginPath();
+    ctx.moveTo( points[0].x, points[0].y );
+    for (var i=1; i < points.length; i++)
+      ctx.lineTo( points[i].x, points[i].y );
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function updateCreature( creature ) {
+    updatePart(creature);
+    for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
+      if ( joint.type === 'flex' ) {
+        joint.joint.SetMotorSpeed( (joint.joint.GetJointAngle()>0?-1:1)   );
+        joint.joint.SetMaxMotorTorque( Math.abs(joint.joint.GetJointAngle() * joint.constant) );
+      }
+    }
+    assessDamage( creature );
   }
 
   function updatePart(part) {
@@ -366,30 +313,18 @@ var deathmatch = (function() {
     eachChild( part, updatePart );
   }
 
-  function updateCreature( creature, world ) {
-    updatePart(creature);
-    for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
-      if ( joint.type === 'flex' ) {
-        joint.joint.SetMotorSpeed( (joint.joint.GetJointAngle()>0?-1:1)   );
-        joint.joint.SetMaxMotorTorque( Math.abs(joint.joint.GetJointAngle() * joint.constant) );
-      }
-    }
-    assessDamage( creature, world );
-  }
-
-  function assessDamage( part, world ) {
+  function assessDamage( part ) {
     var totalDamage = 0, health = part.health;
     for ( var id in health.blows ) totalDamage += health.blows[id].damage
     health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
 
-    if ( part.health.instant_integrity <= 0 ) {
-      junkify( part, world );
-    }
+    if ( part.health.instant_integrity <= 0 )
+      junkify( part );
 
-    eachChild( part, assessDamage, world );
+    eachChild( part, assessDamage );
   }
 
-  function junkify( part, world ) {
+  function junkify( part ) {
     var filterData = new b2FilterData();
     filterData.groupIndex = 0;
     part.body.m_fixtureList.SetFilterData(filterData);
@@ -404,26 +339,26 @@ var deathmatch = (function() {
       part.parent = null;
     }
 
-    eachChild( part, junkify, world );
+    eachChild( part, junkify );
   }
 
-  function updateJunk( world ) {
+  function updateJunk( ) {
     for ( var id in junk ) {
       var part = junk[id];
       if ( part.health.integrity < 0 ) {
         world.DestroyBody(part.body);
         delete junk[id];
       } else if ( part.resize ) {
-        resizeJunk( part, part.resize, world );
+        resizeJunk( part, part.resize );
         part.resize = null;
       }
     }
   }
 
-  function resizeJunk( part, blow, world ) {
+  function resizeJunk( part, blow ) {
     var angle = Math.atan2(blow.normal.y, blow.normal.x);
     var scale = part.health.integrity / (part.health.integrity + blowDamage(blow.damage,part) );
-    var transform = new deathmatch.T().rotate(-angle).scale(scale,1).rotate(angle);
+    var transform = new deathmatch.creature.T().rotate(-angle).scale(scale,1).rotate(angle);
 
     var points = part.body.m_fixtureList.m_shape.m_vertices;
     for ( var i=0, v; v = points[i]; i++ ) {
@@ -487,13 +422,18 @@ var deathmatch = (function() {
   }
 
   return {
+    startMatch : startMatch,
+    updateMatch : updateMatch,
     render: render,
-    generate: generate,
+    renderCage : renderCage,
+    renderJunk: renderJunk,
     addPhysics: addPhysics,
     updateCreature: updateCreature,
     updateJunk: updateJunk,
-    T: T,
-    PIXELS_PER_METER : PIXELS_PER_METER
+    leftCreature : function() { return leftCreature; },
+    rightCreature : function() { return rightCreature; },
+    world : function() { return world; },
+    junk: function() { return junk; }
   }
 })();
 
