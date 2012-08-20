@@ -41,7 +41,9 @@
 
   </style>
   <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
 </head>
 <body onload="init()">
 <div id="player">
@@ -78,6 +80,7 @@
       , b2RevoluteJointDef = joints.b2RevoluteJointDef
       , b2WeldJointDef = joints.b2WeldJointDef
       , b2DebugDraw = dyn.b2DebugDraw ;
+    var PIXELS_PER_METER = deathmatch.contest.PIXELS_PER_METER;
 
     var ANGULAR_DAMPING = 4;
     var leftFacing = false;
@@ -106,31 +109,30 @@
 
     function draw() {
       var ctx = el('display').getContext('2d');
-      ctx.fillStyle = 'rgba(0,0,0,.02)';
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
       if (! debug) ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
 
       ctx.save();
       ctx.fillStyle = 'rgba(10,10,10,.3)';
       ctx.strokeStyle = 'rgb(255,255,255)';
-      ctx.lineWidth = deathmatch.PIXELS_PER_METER;
+      ctx.lineWidth = PIXELS_PER_METER;
 
-      ctx.scale(1/deathmatch.PIXELS_PER_METER, 1/deathmatch.PIXELS_PER_METER);
-      deathmatch.render( creature, ctx );
+      deathmatch.render.render( creature, ctx );
       ctx.restore();
     }
 
     function statbox( top, left, right, bottom ) {
       var bodyDef = new b2BodyDef;
       bodyDef.type = b2Body.b2_staticBody;
-      bodyDef.position.x = (left + (right-left)/2) * deathmatch.PIXELS_PER_METER;
-      bodyDef.position.y = (bottom + (top-bottom)/2) * deathmatch.PIXELS_PER_METER;
+      bodyDef.position.x = (left + (right-left)/2) * PIXELS_PER_METER;
+      bodyDef.position.y = (bottom + (top-bottom)/2) * PIXELS_PER_METER;
       var fixDef = new b2FixtureDef;
       fixDef.density = 1.0;
       fixDef.friction = 0.5;
       fixDef.restitution = 0.2;
       fixDef.shape = new b2PolygonShape;
-      fixDef.shape.SetAsBox((right-left) * deathmatch.PIXELS_PER_METER, (top-bottom) * deathmatch.PIXELS_PER_METER);
-      fixDef.filter.groupIndex = 1;
+      fixDef.shape.SetAsBox((right-left) * PIXELS_PER_METER, (top-bottom) * PIXELS_PER_METER);
+      fixDef.filter.groupIndex = 2;
       world.CreateBody(bodyDef).CreateFixture(fixDef);
     }
 
@@ -138,38 +140,19 @@
       world = new b2World( new b2Vec2(0, 10),  true );
       var ctx = el("display").getContext("2d");
 
-      var fixDef = new b2FixtureDef;
-      fixDef.density = 1.0;
-      fixDef.friction = 0.5;
-      fixDef.restitution = 0.2;
-
-      var bodyDef = new b2BodyDef;
-      bodyDef.angularDamping = ANGULAR_DAMPING;
-
       //create ground
       statbox( ctx.canvas.height, -20, 0, 0 );
-      statbox( 0, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, -20 );
+      statbox( ctx.canvas.height, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, ctx.canvas.height - 5 );
       statbox( ctx.canvas.height, ctx.canvas.width, ctx.canvas.width + 20, 0 );
 
-      bodyDef.position.x = - ctx.canvas.width * deathmatch.PIXELS_PER_METER / 2;
-      bodyDef.position.y = (ctx.canvas.height - 10) * deathmatch.PIXELS_PER_METER;
-      fixDef.shape = new b2PolygonShape;
-      fixDef.shape.SetAsBox(20 * deathmatch.PIXELS_PER_METER, ctx.canvas.height * deathmatch.PIXELS_PER_METER);
-      fixDef.filter.groupIndex = 1;
-      world.CreateBody(bodyDef).CreateFixture(fixDef);
-      fixDef.shape = new b2PolygonShape;
-      fixDef.shape.SetAsBox(2 * ctx.canvas.width * deathmatch.PIXELS_PER_METER, 20 * deathmatch.PIXELS_PER_METER);
-      fixDef.filter.groupIndex = 1;
-      world.CreateBody(bodyDef).CreateFixture(fixDef);
-
-      deathmatch.addPhysics( creature, world, 1 );
+      deathmatch.contest.addPhysics( creature, 1, world );
 
       //setup debug draw
       if (debug) {
         var debugDraw = new b2DebugDraw();
         ctx.save();
         debugDraw.SetSprite(ctx);
-        debugDraw.SetDrawScale(1/deathmatch.PIXELS_PER_METER);
+        debugDraw.SetDrawScale(1/PIXELS_PER_METER);
         debugDraw.SetFillAlpha(0.3);
         debugDraw.SetLineThickness(1.0);
         debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
@@ -184,8 +167,10 @@
       clearInterval(runInterval);
       localStorage.genome = JSON.stringify(genome);
 
-      var transform = new deathmatch.T().translate( el('display').width*deathmatch.PIXELS_PER_METER/2, el('display').height*deathmatch.PIXELS_PER_METER/2 );
-      creature = deathmatch.generate( genome, transform, leftFacing );
+      var transform = new deathmatch.creature.T().translate( 
+        el('display').width*PIXELS_PER_METER/2, 
+        el('display').height*PIXELS_PER_METER/2 );
+      creature = deathmatch.creature.generate( genome, transform, leftFacing, PIXELS_PER_METER );
 
       draw();
 
@@ -304,9 +289,9 @@
   function physicsUpdate() {
     world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
     if (debug) world.DrawDebugData();
+    deathmatch.contest.updateCreature(creature);
 
     world.ClearForces();
-    deathmatch.updateCreature(creature);
 
     draw();
     count++

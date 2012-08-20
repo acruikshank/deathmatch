@@ -2,7 +2,7 @@ deathmatch = (window.deathmatch || {});
 deathmatch.contest = (function() {
   var PIXELS_PER_METER = .01;
 
-  var DAMAGE_FACTOR = 20;
+  var DAMAGE_FACTOR = 25;
   var JUNK_DAMAGE_FACTOR = 10;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
@@ -19,7 +19,6 @@ deathmatch.contest = (function() {
     sideCageIntercept : 0,
     centerCageIntercept : 0
   };
-
 
   var fixture_index = 10;
 
@@ -83,12 +82,14 @@ deathmatch.contest = (function() {
     var transform = new deathmatch.creature.T().translate( LEFT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
     leftCreature = deathmatch.creature.generate( leftGenome, transform, true, PIXELS_PER_METER );
     leftCreature.name = 'left';
-    addPhysics( leftCreature, 1 );
+    addPhysics( leftCreature, 1, world );
 
     transform = new deathmatch.creature.T().translate( RIGHT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
     rightCreature  = deathmatch.creature.generate( rightGenome, transform, false, PIXELS_PER_METER );
     rightCreature.name = 'right';
-    addPhysics( rightCreature, 2 );
+    addPhysics( rightCreature, 2, world );
+
+    addContactListeners( world );
 
     return world;
   }
@@ -132,43 +133,7 @@ deathmatch.contest = (function() {
     return body;
   }
 
-  function addPhysics( creature, group ) {
-    var bodyDef = new b2BodyDef;
-    bodyDef.angularDamping = ANGULAR_DAMPING;
-
-    //create some objects
-    (function addPart(part) {
-      bodyDef.type = b2Body.b2_dynamicBody;
-      bodyDef.position.x = part.origin.x;
-      bodyDef.position.y = part.origin.y;
-      bodyDef.angle = part.theta;
-
-      var points = [];
-      var half_angle = Math.PI / part.sides;
-      var t = new deathmatch.creature.T().scale(part.oblong,1/part.oblong);
-      t.rotate(Math.PI+half_angle);
-      for (var i=0; i < part.sides; i++) {
-        var point = t.project({x:0, y:part.r * PIXELS_PER_METER});
-        points.push( new b2Vec2(point.x,point.y) );
-        t.rotate( 2*half_angle );
-      }
-      FIXTURE_DEF.filter.groupIndex = -group;
-      FIXTURE_DEF.shape = new b2PolygonShape.AsArray( points, points.length );
-
-      part.body = world.CreateBody(bodyDef)
-      part.body.id = fixture_index++;
-      part.body.part = part;
-
-      part.body.CreateFixture(FIXTURE_DEF);
-
-      if (part.children) for (var i=0,child; child=part.children[i],i<part.sides; i++) {
-        if ( child ) {
-          addPart(child);
-          creature.joints.push( addJoint(part, child, points[i], creature.leftFacing ) );
-        }
-      }
-    })(creature);
-
+  function addContactListeners( world ) {
     world.SetContactListener({
       BeginContact: function(contact) {
         if ( ! contact.m_fixtureA.m_body.id || ! contact.m_fixtureB.m_body.id ) return;
@@ -202,7 +167,46 @@ deathmatch.contest = (function() {
     });
   }
 
-  function addJoint( parent, child, point, leftFacing ) {
+  function addPhysics( creature, group, world ) {
+    var bodyDef = new b2BodyDef;
+    bodyDef.angularDamping = ANGULAR_DAMPING;
+
+    //create some objects
+    (function addPart(part) {
+      bodyDef.type = b2Body.b2_dynamicBody;
+      bodyDef.position.x = part.origin.x;
+      bodyDef.position.y = part.origin.y;
+      bodyDef.angle = part.theta;
+
+      var points = [];
+      var half_angle = Math.PI / part.sides;
+      var t = new deathmatch.creature.T().scale(part.oblong,1/part.oblong);
+      t.rotate(Math.PI+half_angle);
+      for (var i=0; i < part.sides; i++) {
+        var point = t.project({x:0, y:part.r * PIXELS_PER_METER});
+        points.push( new b2Vec2(point.x,point.y) );
+        t.rotate( 2 * half_angle );
+      }
+      FIXTURE_DEF.filter.groupIndex = -group;
+      FIXTURE_DEF.shape = new b2PolygonShape.AsArray( points, points.length );
+
+      part.body = world.CreateBody(bodyDef)
+      part.body.id = fixture_index++;
+      part.body.part = part;
+
+      part.body.CreateFixture(FIXTURE_DEF);
+
+      if (part.children) for (var i=0,child; child=part.children[i],i<part.sides; i++) {
+        if ( child ) {
+          var index = creature.leftFacing ? i : part.sides - i - 1;
+          addPart(child);
+          creature.joints.push( addJoint(part, child, points[index], creature.leftFacing, world ) );
+        }
+      }
+    })(creature);
+  }
+
+  function addJoint( parent, child, point, leftFacing, world ) {
     var type, jointDef, sym_flex = Math.abs(child.flex - .5), constant;
     if ( sym_flex >= .3 ) {
       type = 'driver'

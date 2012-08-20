@@ -4,6 +4,7 @@ deathmatch.creature = (function() {
   var MIN_PART_MASS = .51;
   var MAX_OBLIQUE = 5;
   var DENSITY = .01;
+  var TRAITS = ['tak','giv','obl','ext','ang','flx'];
 	
   var ta = {};
   ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
@@ -104,8 +105,9 @@ deathmatch.creature = (function() {
         work_transform.rotate(Math.PI+half_angle);
 
         for ( var j=0,l2=type.chd.length; j<l2; chd_type=j++ ) {
-          var child_type = genome[type.chd[j]];
-          if ( child_type && child_masses[j] ) {
+          var index = leftFacing ? j : type.chd.length - j - 1;
+          var child_type = genome[type.chd[index]];
+          if ( child_type && child_masses[index] ) {
 
             point = work_transform.project({x:part.r/PIXELS_PER_METER,y:0}); 
             dx = point.x-part.origin.x; dy = point.y-part.origin.y;
@@ -113,14 +115,14 @@ deathmatch.creature = (function() {
               Math.atan2(dy,dx)-part.theta).translate(0,Math.sqrt(dx*dx+dy*dy));
 
             part.children = part.children || [];
-            part.children[j] = {
+            part.children[index] = {
                 parent: part,
-                index: j,
-                type: type.chd[j],
-                mass: child_masses[j],
+                index: index,
+                type: type.chd[index],
+                mass: child_masses[index],
                 transform: child_transform };
           }
-          work_transform.rotate( 2 * half_angle);
+          work_transform.rotate(2 * half_angle);
         }
 
         part.oblong = obl;
@@ -138,8 +140,115 @@ deathmatch.creature = (function() {
     return creature;
   }
 
+  var TRAIT_SNP_PROBABILITY,
+      SIDE_SNP_PROBABILITY,
+      TRAIT_SHIFT_PROBABILITY,
+      SIDE_SHIFT_PROBABILITY,
+      SIDE_DUPLICATION_PROBABILITY,
+      SIDE_DELETION_PROBILITY,
+      CHROMOSOME_DUPLICATION_PROBABILITY,
+      CHROMOSOME_DELETION_PROBABILITY;
+
+  function coinFlip() { return Math.random() < .5; }
+  function randIndex(ar) { return (Math.random() * ar.length)|0; }
+  function randBetween(a,b) { return a + Math.random() * (b-a); }
+  function normalRandom() { return Math.sqrt( -2 * Math.log(Math.random()||1) ) * Math.cos(2*Math.PI*(Math.random()||1)); }
+
+  function cloneChromosome(c) { 
+    var clone = {};
+    for (var trait in c) 
+      clone[trait] = (trait == 'chd' ? c.chd.slice(0) : c[trait]);
+    return clone;
+  }
+
+  function randomCreature() {
+    var creature = [];
+    var chromosomes = Math.max( 1, Math.round(2 + normalRandom()) );
+    for ( var i=0; i < chromosomes; i++ ) {
+      var chromosome = {};
+      for (var j=0,trait; trait=TRAITS[j]; j++)
+        chromosome[trait] = Math.random();
+      var children = Math.max( 3, Math.round(4 + normalRandom()) );
+      chromosome.chd = [];
+      for (var j=0; j<children; j++)
+        chromosome.chd[j] = Math.max( 0, Math.round( 2 + normalRandom()*2 ) );
+      creature.push(chromosome);
+    }
+    return creature;
+  }
+
+  /*
+  recombine - take 2 genomes and generate a third offspring genome.
+  Recombination should take genetic components from each parent such that any compnent
+    has an equal but random chance of coming from either parent. For the most part,
+    components should come whole from one parent or the other, though there could be
+    some averaging at recombination boundaries. Recombination maintains heritability
+    while generating offspring distributed over the genotypical space constrained by
+    the total genetic variation in the population.
+  SNP's are a mutation of a single genetic component in a random direction. SNP's introduce
+    genetic variation into the population. Since SNP's aren't inherited from the prior 
+    generation and aren't influenced by the fitness of the parent, they should be rare.
+    The mutation rate will affect the rate of evolution and the ultimate fitness of the
+    creatures.
+  Transcription errors are shifts in meaning of genetic components (e.g. each component
+    in a section of a parents chromosome will be interpreted as the component before it
+    in the child). Errors also include duplications and deletions of whole chromosomes.
+    Transcription errors should usually be fatal to the child, but they provide the
+    potential to jump to different areas of morphological space. Duplications have the 
+    potential to add non-functioning genetic material that may later evolve into 
+    advantageous structures. Deletions have the potential to remove unnecessary genetic
+    material that creates a more stable genetic population.
+
+  Implementation
+    For overlapping chromosomes, randomly choose a chromosome from a parent. Then choose
+    two random trait indexes and copy each trait in-between the indexes from the other
+    parent. For the traits at the indices, choose a random value between the parents using
+    a parameterizable distribution that favors values close to one parent or the other.
+    A transcription error might occur here that tries to copy the values one trait early
+    or one trait late. A SNP might occur that selects a new value for one of the traits.
+    Recombination of the side indices is similar to the traits. If one parent has more
+    sides on a chromosome, they will be all kept or all deleted depeneding on the first
+    coin flip. Any side index may be duplicated or deleted.
+    The entire chormosome may be duplicated or deleted.
+    A coin flip will determine whether non-overlapping chromosomes are preserved in the
+    child. There will be no recombination for these chromosomes, but all the mutations
+    will apply.
+  */
+  function recombine( parent1, parent2 ) {
+    var child = [], 
+        min = Math.min(parent1.length,parent2.length), 
+        max = Math.max(parent1.length,parent2.length);
+    for ( var i=0; i < min; i++ ) {
+      var first = coinFlip();
+      var cloner = cloneChromosome( first ? parent1[i] : parent2[i] );
+      var donor = first ? parent2[i] : parent1[i];
+
+      // traits
+      var ti1 = randIndex(TRAITS), ti2 = randIndex(TRAITS),
+          start = Math.min(ti1,ti2), end = Math.max(ti1,ti2);
+      cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start]] );
+      for ( var j=start+1; j<end-1; j++ )
+        cloner[TRAITS[j]] = donor[TRAITS[j]];
+      cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end]] );
+
+      // child indices
+      ti1 = randIndex(donor.chd); ti2 = randIndex(donor.chd);
+      start = Math.min(ti1,ti2); end = Math.max(ti1,ti2);
+      for ( var j=start; j<end; j++ )
+        cloner.chd[j] = donor[j];
+
+      child.push(cloner);
+    }
+    for ( i=min; i < max; i++ )
+      child.push(parent1[i] || parent2[i]);
+
+    return child;
+  }
+
   return {
     generate: generate,
+    randomCreature : randomCreature,
+    recombine : recombine,
     T: T
   }
 })()
