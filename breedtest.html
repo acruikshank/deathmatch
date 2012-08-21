@@ -60,6 +60,7 @@
     }
 
     function generate() {
+      clearInterval(physicsInterval);
       var parentEl = el('parent1');
       var ctx1 = parentEl.getContext('2d');
       parent1 = deathmatch.creature.randomCreature();

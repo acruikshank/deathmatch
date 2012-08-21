@@ -140,8 +140,9 @@ deathmatch.creature = (function() {
     return creature;
   }
 
-  var TRAIT_SNP_PROBABILITY,
-      SIDE_SNP_PROBABILITY,
+  var EDGE_SLOPE = 5,
+      TRAIT_SNP_PROBABILITY = .01,
+      SIDE_SNP_PROBABILITY = .01,
       TRAIT_SHIFT_PROBABILITY,
       SIDE_SHIFT_PROBABILITY,
       SIDE_DUPLICATION_PROBABILITY,
@@ -151,7 +152,8 @@ deathmatch.creature = (function() {
 
   function coinFlip() { return Math.random() < .5; }
   function randIndex(ar) { return (Math.random() * ar.length)|0; }
-  function randBetween(a,b) { return a + Math.random() * (b-a); }
+  function sigmoidDist(slope) { var x=Math.random(); return x < .5 ? Math.pow(2*x,slope)/2 : 1 - Math.pow(2*(1-x),slope)/2; }
+  function randBetween(a,b,slope) { return a + sigmoidDist(slope) * (b-a); }
   function normalRandom() { return Math.sqrt( -2 * Math.log(Math.random()||1) ) * Math.cos(2*Math.PI*(Math.random()||1)); }
 
   function cloneChromosome(c) { 
@@ -211,8 +213,8 @@ deathmatch.creature = (function() {
     coin flip. Any side index may be duplicated or deleted.
     The entire chormosome may be duplicated or deleted.
     A coin flip will determine whether non-overlapping chromosomes are preserved in the
-    child. There will be no recombination for these chromosomes, but all the mutations
-    will apply.
+    child. There will be no recombination for these chromosomes, but SNPs, duplications
+    and deletions will apply.
   */
   function recombine( parent1, parent2 ) {
     var child = [], 
@@ -226,10 +228,10 @@ deathmatch.creature = (function() {
       // traits
       var ti1 = randIndex(TRAITS), ti2 = randIndex(TRAITS),
           start = Math.min(ti1,ti2), end = Math.max(ti1,ti2);
-      cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start]] );
+      cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start]], EDGE_SLOPE );
       for ( var j=start+1; j<end-1; j++ )
         cloner[TRAITS[j]] = donor[TRAITS[j]];
-      cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end]] );
+      cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end]], EDGE_SLOPE );
 
       // child indices
       ti1 = randIndex(donor.chd); ti2 = randIndex(donor.chd);
@@ -237,12 +239,23 @@ deathmatch.creature = (function() {
       for ( var j=start; j<end; j++ )
         cloner.chd[j] = donor[j];
 
-      child.push(cloner);
+      child.push( mutate(cloner) );
     }
     for ( i=min; i < max; i++ )
-      child.push(parent1[i] || parent2[i]);
+      child.push( mutate( parent1[i] || parent2[i] ) );
 
     return child;
+  }
+
+  function mutate( chromosome ) {
+    if ( Math.random() < TRAIT_SNP_PROBABILITY )
+      chromosome[TRAITS[randIndex(TRAITS.length)]] = Math.random();
+
+    if ( Math.random() < SIDE_SNP_PROBABILITY ) {
+      var index = randIndex(chromosome.chd);
+      chromosome.chd[index] = Math.max(0, chromosome.chd[index] + (coinFlip() ? 1 : -1));
+    }
+    return chromosome;
   }
 
   return {
