@@ -70,7 +70,7 @@
 
       parentEl = el('parent2');
       var ctx2 = parentEl.getContext('2d');
-      parent2 = deathmatch.creature.randomCreature();
+      parent2 = parent1; // deathmatch.creature.randomCreature();
       renderGenome( ctx2, parent2, 1 );
       el('parent2genome').innerHTML = output_genome(parent2);
       addOverHandlers( parentEl, parent2, 1 );
@@ -79,8 +79,10 @@
       for ( var i=0; i < 10; i++ )
         offspring.push( deathmatch.creature.recombine(parent1, parent2 ) );
 
+      console.log('parent', parent1);
       el('offspring').innerHTML = '';
       offspring.forEach( function(genome) {
+        console.log(genome)
         var box = document.createElement('DIV');
         var c = document.createElement('CANVAS');
         c.setAttribute('width','200');

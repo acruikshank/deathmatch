@@ -141,17 +141,20 @@ deathmatch.creature = (function() {
   }
 
   var EDGE_SLOPE = 5,
-      TRAIT_SNP_PROBABILITY = .01,
-      SIDE_SNP_PROBABILITY = .01,
-      TRAIT_SHIFT_PROBABILITY,
-      SIDE_SHIFT_PROBABILITY,
-      SIDE_DUPLICATION_PROBABILITY,
-      SIDE_DELETION_PROBILITY,
-      CHROMOSOME_DUPLICATION_PROBABILITY,
-      CHROMOSOME_DELETION_PROBABILITY;
+      GENERAL_MUTATION_RATE = .02;
+      TRAIT_SNP = .4 * GENERAL_MUTATION_RATE,
+      CHILD_SNP = .75 * GENERAL_MUTATION_RATE,
+      TRAIT_SHIFT = .02 * GENERAL_MUTATION_RATE,
+      CHILD_SHIFT = .4 * GENERAL_MUTATION_RATE,
+      CHILD_DUPLICATION = .25 * GENERAL_MUTATION_RATE,
+      CHILD_DELETION = .5 * GENERAL_MUTATION_RATE,
+      CHROMOSOME_DUPLICATION = .1 * GENERAL_MUTATION_RATE,
+      CHROMOSOME_DELETION = .1 * GENERAL_MUTATION_RATE;
 
   function coinFlip() { return Math.random() < .5; }
+  function eventOccurance(probability) { return Math.random() < probability; }
   function randIndex(ar) { return (Math.random() * ar.length)|0; }
+  function randItem(ar) { return ar[randIndex(ar)]; }
   function sigmoidDist(slope) { var x=Math.random(); return x < .5 ? Math.pow(2*x,slope)/2 : 1 - Math.pow(2*(1-x),slope)/2; }
   function randBetween(a,b,slope) { return a + sigmoidDist(slope) * (b-a); }
   function normalRandom() { return Math.sqrt( -2 * Math.log(Math.random()||1) ) * Math.cos(2*Math.PI*(Math.random()||1)); }
@@ -228,33 +231,75 @@ deathmatch.creature = (function() {
       // traits
       var ti1 = randIndex(TRAITS), ti2 = randIndex(TRAITS),
           start = Math.min(ti1,ti2), end = Math.max(ti1,ti2);
-      cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start]], EDGE_SLOPE );
-      for ( var j=start+1; j<end-1; j++ )
-        cloner[TRAITS[j]] = donor[TRAITS[j]];
-      cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end]], EDGE_SLOPE );
+
+      // handle traitshift mutation
+      var donorShift = 0;
+      if ( eventOccurance(TRAIT_SHIFT) )
+        donorShift = coinFlip() ? 1 : -1;
+
+      // copy donor traits, averaging the ends out the ends
+      if (start+donorShift >= 0)
+        cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start+donorShift]], EDGE_SLOPE );
+      for ( var j=start+1; j<end; j++ )
+        cloner[TRAITS[j]] = donor[TRAITS[donorShift+j]];
+      if (end+donorShift < TRAITS.length)
+        cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end+donorShift]], EDGE_SLOPE );
 
       // child indices
       ti1 = randIndex(donor.chd); ti2 = randIndex(donor.chd);
-      start = Math.min(ti1,ti2); end = Math.max(ti1,ti2);
-      for ( var j=start; j<end; j++ )
-        cloner.chd[j] = donor[j];
+      start = Math.min(ti1,ti2); 
+      end = Math.max(ti1,ti2);
 
+      // handle child shift mutations
+      donorShift = 0;
+      if ( eventOccurance(CHILD_SHIFT) )
+        donorShift = coinFlip() ? 1 : -1;
+
+      // copy over donor children (sides)
+      for ( var j=start; j<=end; j++ )
+        if (j+donorShift >= 0 && j+donorShift < cloner.chd.length)
+          cloner.chd[j] = donor.chd[j+donorShift];
+
+      // apply additional mutations to chromosome and clone
       child.push( mutate(cloner) );
     }
     for ( i=min; i < max; i++ )
       child.push( mutate( parent1[i] || parent2[i] ) );
 
+    // apply chromosome duplication mutation
+    if ( eventOccurance(CHROMOSOME_DUPLICATION) ) {
+      var index = randIndex(child);
+      child.splice(index,0,child[index]);      
+    }
+
+    // apply chromosome deletion mutation
+    if ( child.length > 1 && eventOccurance(CHROMOSOME_DELETION) ) {
+      var index = randIndex(child);
+      child.splice(index,1);      
+    }
+
     return child;
   }
 
   function mutate( chromosome ) {
-    if ( Math.random() < TRAIT_SNP_PROBABILITY )
-      chromosome[TRAITS[randIndex(TRAITS.length)]] = Math.random();
+    if ( eventOccurance(TRAIT_SNP) )
+      chromosome[randItem(TRAITS)] = Math.random();
 
-    if ( Math.random() < SIDE_SNP_PROBABILITY ) {
+    if ( eventOccurance(CHILD_SNP) ) {
       var index = randIndex(chromosome.chd);
       chromosome.chd[index] = Math.max(0, chromosome.chd[index] + (coinFlip() ? 1 : -1));
     }
+
+    if ( eventOccurance(CHILD_DUPLICATION) ) {
+      var index = randIndex(chromosome.chd);
+      chromosome.chd.splice(index,0,chromosome.chd[index]);
+    }
+
+    if ( chromosome.chd.length > 3 && eventOccurance(CHILD_DELETION) ) {
+      var index = randIndex(chromosome.chd);
+      chromosome.chd.splice(index,1);
+    }
+
     return chromosome;
   }
 
