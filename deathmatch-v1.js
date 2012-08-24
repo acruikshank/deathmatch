@@ -15,9 +15,7 @@ deathmatch.contest = (function() {
   var cageParameters =  {
     CAGE_WIDTH : CAGE_WIDTH,
     CAGE_MARGIN : CAGE_MARGIN,
-    CAGE_BOTTOM : CAGE_BOTTOM,
-    sideCageIntercept : 0,
-    centerCageIntercept : 0
+    CAGE_BOTTOM : CAGE_BOTTOM
   };
 
   var fixture_index = 10;
@@ -49,7 +47,6 @@ deathmatch.contest = (function() {
   var CAGE_BODY_DEF = new b2BodyDef;
   CAGE_BODY_DEF.angularDamping = 4;
 
-  var junk = {}, world, leftCreature, rightCreature, floorSlope = .15;
   var sideCageIntercept, centerCageIntercept;
 
   function boundedExponential( x, min, max ) { return min * Math.exp( Math.log(max / min) * x ); }
@@ -72,55 +69,54 @@ deathmatch.contest = (function() {
         if (child) f( child, arg1, arg2 );
   }
 
-  function startMatch( leftGenome, rightGenome ) {
+  function startMatch( leftOrganism, rightOrganism ) {
+    var match = { leftOrganism:leftOrganism, rightOrganism:rightOrganism, junk:{} }
     var s = PIXELS_PER_METER;
-    world = new b2World( new b2Vec2(0, 10),  false );
-    floorSlope = (.5  + Math.random()) / 10;
+    match.world = new b2World( new b2Vec2(0, 10),  false );
+    match.floorSlope = (.5  + Math.random()) / 10;
 
-    generateCage();
+    generateCage(match);
 
     var transform = new deathmatch.creature.T().translate( LEFT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
-    leftCreature = deathmatch.creature.generate( leftGenome, transform, true, PIXELS_PER_METER );
-    leftCreature.name = 'left';
-    addPhysics( leftCreature, 1, world );
+    match.leftCreature = deathmatch.creature.generate( leftOrganism.genome, transform, true, s );
+    addPhysics( match.leftCreature, 1, match.world );
 
     transform = new deathmatch.creature.T().translate( RIGHT_DROP_X*s, (CAGE_BOTTOM - DROP_HEIGHT)*s );
-    rightCreature  = deathmatch.creature.generate( rightGenome, transform, false, PIXELS_PER_METER );
-    rightCreature.name = 'right';
-    addPhysics( rightCreature, 2, world );
+    match.rightCreature  = deathmatch.creature.generate( rightOrganism.genome, transform, false, s );
+    addPhysics( match.rightCreature, 2, match.world );
 
-    addContactListeners( world );
+    addContactListeners( match.world );
 
-    return world;
+    return match;
   }
 
-  function updateMatch() {
-    world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
+  function updateMatch( match ) {
+    match.world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
 
-    deathmatch.contest.updateCreature( leftCreature );
-    deathmatch.contest.updateCreature( rightCreature );
-    deathmatch.contest.updateJunk( );
+    updateCreature( match.leftCreature, match );
+    updateCreature( match.rightCreature, match );
+    updateJunk( match );
 
-    world.ClearForces();    
+    match.world.ClearForces();    
   }
 
-  function generateCage() {
-    var bottom  = statbox( 0, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
-    bottom.SetAngle( floorSlope );
-    var bottom  = statbox( CAGE_WIDTH/2-CAGE_MARGIN, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
-    bottom.SetAngle( -floorSlope );
+  function generateCage( match ) {
+    var bottom  = statbox( match.world, 0, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    bottom.SetAngle( match.floorSlope );
+    var bottom  = statbox( match.world, CAGE_WIDTH/2-CAGE_MARGIN, CAGE_BOTTOM-3*CAGE_MARGIN, CAGE_WIDTH/2 + CAGE_MARGIN, 2*CAGE_MARGIN);
+    bottom.SetAngle( -match.floorSlope );
 
-    statbox( 0, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
-    statbox( CAGE_WIDTH-CAGE_MARGIN, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
+    statbox( match.world, 0, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
+    statbox( match.world, CAGE_WIDTH-CAGE_MARGIN, -CAGE_BOTTOM, CAGE_MARGIN, 4*CAGE_BOTTOM);
 
     var x0 = (CAGE_WIDTH/2 + CAGE_MARGIN)/2, y0 = CAGE_BOTTOM-3*CAGE_MARGIN;
-    var y1 = y0 + CAGE_MARGIN * floorSlope * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
-    var x1 = x0 + CAGE_MARGIN * Math.sqrt( 1 / (1 + floorSlope*floorSlope) );
-    cageParameters.sideCageIntercept = y1 - (x1 - CAGE_MARGIN) * floorSlope;
-    cageParameters.centerCageIntercept = y1 - (x1 - CAGE_WIDTH / 2) * floorSlope;
+    var y1 = y0 + CAGE_MARGIN * match.floorSlope * Math.sqrt( 1 / (1 + match.floorSlope*match.floorSlope) );
+    var x1 = x0 + CAGE_MARGIN * Math.sqrt( 1 / (1 + match.floorSlope*match.floorSlope) );
+    match.sideCageIntercept = y1 - (x1 - CAGE_MARGIN) * match.floorSlope;
+    match.centerCageIntercept = y1 - (x1 - CAGE_WIDTH / 2) * match.floorSlope;
   }
 
-  function statbox( x, y, w, h ) {
+  function statbox( world, x, y, w, h ) {
     var s = PIXELS_PER_METER;
     CAGE_BODY_DEF.type = b2Body.b2_staticBody;
     CAGE_BODY_DEF.position.x = (x + w/2)*s;
@@ -231,7 +227,7 @@ deathmatch.contest = (function() {
     return {joint:child.attachment, constant:constant, type:type}
   }
 
-  function updateCreature( creature ) {
+  function updateCreature( creature, match ) {
     updatePart(creature);
     for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
       if ( joint.type === 'flex' ) {
@@ -239,7 +235,7 @@ deathmatch.contest = (function() {
         joint.joint.SetMaxMotorTorque( Math.abs(joint.joint.GetJointAngle() * joint.constant) );
       }
     }
-    assessDamage( creature );
+    assessDamage( creature, match );
   }
 
   function updatePart(part) {
@@ -250,41 +246,41 @@ deathmatch.contest = (function() {
     eachChild( part, updatePart );
   }
 
-  function assessDamage( part ) {
+  function assessDamage( part, match ) {
     var totalDamage = 0, health = part.health;
     for ( var id in health.blows ) totalDamage += health.blows[id].damage
     health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
 
     if ( part.health.instant_integrity <= 0 )
-      junkify( part );
+      junkify( part, match );
 
-    eachChild( part, assessDamage );
+    eachChild( part, assessDamage, match );
   }
 
-  function junkify( part ) {
+  function junkify( part, match ) {
     var filterData = new b2FilterData();
     filterData.groupIndex = 0;
     part.body.m_fixtureList.SetFilterData(filterData);
     part.junk = true;
-    junk[part.body.id] = part;
+    match.junk[part.body.id] = part;
     part.health.integrity = 1;
 
     if (part.parent) { 
-      world.DestroyJoint( part.attachment );
+      match.world.DestroyJoint( part.attachment );
       part.attachment = null;
       delete part.parent.children[part.index];
       part.parent = null;
     }
 
-    eachChild( part, junkify );
+    eachChild( part, junkify, match );
   }
 
-  function updateJunk( ) {
-    for ( var id in junk ) {
-      var part = junk[id];
+  function updateJunk( match ) {
+    for ( var id in match.junk ) {
+      var part = match.junk[id];
       if ( part.health.integrity < 0 ) {
-        world.DestroyBody(part.body);
-        delete junk[id];
+        match.world.DestroyBody(part.body);
+        delete match.junk[id];
       } else if ( part.resize ) {
         resizeJunk( part, part.resize );
         part.resize = null;
@@ -363,13 +359,8 @@ deathmatch.contest = (function() {
     cageParameters : cageParameters,
     startMatch : startMatch,
     updateMatch : updateMatch,
-    addPhysics: addPhysics,
-    updateCreature: updateCreature,
-    updateJunk: updateJunk,
-    leftCreature : function() { return leftCreature; },
-    rightCreature : function() { return rightCreature; },
-    world : function() { return world; },
-    junk: function() { return junk; }
+    addPhysics : addPhysics,
+    updateCreature : updateCreature
   }
 })();
 

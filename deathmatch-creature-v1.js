@@ -1,3 +1,23 @@
+/*
+  Glossary:
+    organism: An organism is a genome plus information about genome's performance and
+            lineage. Organism's will compete in matches througout a generation and then
+            be bred to produce the next generation.
+    genome: An organism's genetic material. The genome is the basic plan for a creature. 
+            It persists for an entire generation, then parts of it are passed on to the
+            organism's children.
+    creature: The body of an organism. A creature will be generated from the organism's 
+            genome for each match. The creature contains the geometry and physics of the
+            organism as well as damage received during the course of a match. A creature
+            may be said to be the genome's phenotype.
+    generation: A generation is a set of organisms. These organisms will compete in
+            matches to determine relative fitness. This information will then be used to
+            breed a new generation of organisms.
+    species: Species create a partition of organisms that span generations. Organisms may
+            only breed within species. Also organisms within a species should not fight
+            matches against each other. Species may sub-divide to produce new species.
+            Species span generations.
+ */
 deathmatch = window.deathmatch || {};
 deathmatch.creature = (function() {
   var MASS = 100;
@@ -140,6 +160,23 @@ deathmatch.creature = (function() {
     return creature;
   }
 
+
+  function randomGenome() {
+    var genome = [];
+    var chromosomes = Math.max( 1, Math.round(2 + normalRandom()) );
+    for ( var i=0; i < chromosomes; i++ ) {
+      var chromosome = {};
+      for (var j=0,trait; trait=TRAITS[j]; j++)
+        chromosome[trait] = Math.random();
+      var children = Math.max( 3, Math.round(4 + normalRandom()) );
+      chromosome.chd = [];
+      for (var j=0; j<children; j++)
+        chromosome.chd[j] = Math.max( 0, Math.round( 2 + normalRandom()*2 ) );
+      genome.push(chromosome);
+    }
+    return genome;
+  }
+
   var EDGE_SLOPE = 5,
       GENERAL_MUTATION_RATE = .02;
       TRAIT_SNP = .4 * GENERAL_MUTATION_RATE,
@@ -166,28 +203,12 @@ deathmatch.creature = (function() {
     return clone;
   }
 
-  function randomCreature() {
-    var creature = [];
-    var chromosomes = Math.max( 1, Math.round(2 + normalRandom()) );
-    for ( var i=0; i < chromosomes; i++ ) {
-      var chromosome = {};
-      for (var j=0,trait; trait=TRAITS[j]; j++)
-        chromosome[trait] = Math.random();
-      var children = Math.max( 3, Math.round(4 + normalRandom()) );
-      chromosome.chd = [];
-      for (var j=0; j<children; j++)
-        chromosome.chd[j] = Math.max( 0, Math.round( 2 + normalRandom()*2 ) );
-      creature.push(chromosome);
-    }
-    return creature;
-  }
-
   /*
   recombine - take 2 genomes and generate a third offspring genome.
   Recombination should take genetic components from each parent such that any compnent
     has an equal but random chance of coming from either parent. For the most part,
     components should come whole from one parent or the other, though there could be
-    some averaging at recombination boundaries. Recombination maintains heritability
+    some averaging at transcription boundaries. Recombination maintains heritability
     while generating offspring distributed over the genotypical space constrained by
     the total genetic variation in the population.
   SNP's are a mutation of a single genetic component in a random direction. SNP's introduce
@@ -305,7 +326,7 @@ deathmatch.creature = (function() {
 
   return {
     generate: generate,
-    randomCreature : randomCreature,
+    randomGenome : randomGenome,
     recombine : recombine,
     T: T
   }

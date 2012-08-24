@@ -39,15 +39,15 @@ deathmatch.render = (function() {
     }
   }
 
-  function renderCage( ctx ) {
+  function renderCage( ctx, match ) {
     var p = deathmatch.contest.cageParameters;
     ctx.save();
     ctx.beginPath()
     ctx.moveTo( -p.CAGE_MARGIN, -20 );
     ctx.lineTo( p.CAGE_MARGIN, -20 );
-    ctx.lineTo( p.CAGE_MARGIN, p.sideCageIntercept );
-    ctx.lineTo( p.CAGE_WIDTH / 2, p.centerCageIntercept );
-    ctx.lineTo( p.CAGE_WIDTH - p.CAGE_MARGIN, p.sideCageIntercept );
+    ctx.lineTo( p.CAGE_MARGIN, match.sideCageIntercept );
+    ctx.lineTo( p.CAGE_WIDTH / 2, match.centerCageIntercept );
+    ctx.lineTo( p.CAGE_WIDTH - p.CAGE_MARGIN, match.sideCageIntercept );
     ctx.lineTo( p.CAGE_WIDTH - p.CAGE_MARGIN, -20 );
     ctx.lineTo( p.CAGE_WIDTH + p.CAGE_MARGIN, -20 );
     ctx.lineTo( p.CAGE_WIDTH + p.CAGE_MARGIN, p.CAGE_BOTTOM+20 );
@@ -98,31 +98,30 @@ deathmatch.render = (function() {
     eachChild( part, drawDamage, ctx, left );
   }
 
-  function renderCanvas( ctx ) {
+  function renderCanvas( ctx, match ) {
     ctx.save();
     ctx.lineWidth = deathmatch.contest.PIXELS_PER_METER;
 
     ctx.fillStyle = 'rgba(40,40,40,.3)';
     ctx.strokeStyle = '#666';
-    var junk = deathmatch.contest.junk();
-    for ( var id in junk )
-      renderJunk( junk[id], ctx );
+    for ( var id in match.junk )
+      renderJunk( match.junk[id], ctx );
 
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ctx.strokeStyle = 'rgba(255,255,255,.7)';
-    if ( ! deathmatch.contest.rightCreature().junk )
-      render( deathmatch.contest.rightCreature(), ctx );
-    if ( ! deathmatch.contest.leftCreature().junk ) 
-      render( deathmatch.contest.leftCreature(), ctx );
-    if ( ! deathmatch.contest.leftCreature().junk ) 
-      drawDamage( deathmatch.contest.leftCreature(), ctx, true );
-    if ( ! deathmatch.contest.rightCreature().junk )
-      drawDamage( deathmatch.contest.rightCreature(), ctx, false );
+    if ( ! match.rightCreature.junk )
+      render( match.rightCreature, ctx );
+    if ( ! match.leftCreature.junk ) 
+      render( match.leftCreature, ctx );
+    if ( ! match.leftCreature.junk ) 
+      drawDamage( match.leftCreature, ctx, true );
+    if ( ! match.rightCreature.junk )
+      drawDamage( match.rightCreature, ctx, false );
 
     ctx.fillStyle = '#ccc';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
-    renderCage(ctx);
+    renderCage(ctx, match);
     ctx.restore();    
   }
 
