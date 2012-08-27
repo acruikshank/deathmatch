@@ -4,6 +4,11 @@ deathmatch.contest = (function() {
 
   var DAMAGE_FACTOR = 25;
   var JUNK_DAMAGE_FACTOR = 10;
+  var MINIMUM_MOTION = .02;
+  var TKO_ITERATIONS = 100;
+  var BOTH_IMMOBILE_ITERATIONS = 50;
+  var KO_BONUS = 25;
+  var DRAW_ITERATIONS = 1000;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
   var MAX_DRIVER_SPEED = 10, MIN_DRIVER_SPEED = .5;
@@ -11,7 +16,7 @@ deathmatch.contest = (function() {
   var ANGULAR_DAMPING = 4;
 
   var CAGE_WIDTH = 800, CAGE_MARGIN = 10;
-  var CAGE_BOTTOM = 500, DROP_HEIGHT = 300, LEFT_DROP_X = 200, RIGHT_DROP_X = CAGE_WIDTH - LEFT_DROP_X;
+  var CAGE_BOTTOM = 500, DROP_HEIGHT = 200, LEFT_DROP_X = 200, RIGHT_DROP_X = CAGE_WIDTH - LEFT_DROP_X;
   var cageParameters =  {
     CAGE_WIDTH : CAGE_WIDTH,
     CAGE_MARGIN : CAGE_MARGIN,
@@ -50,7 +55,7 @@ deathmatch.contest = (function() {
   var sideCageIntercept, centerCageIntercept;
 
   function boundedExponential( x, min, max ) { return min * Math.exp( Math.log(max / min) * x ); }
-  function blowDamage( blow, part ) { return (part.junk?JUNK_DAMAGE_FACTOR:DAMAGE_FACTOR) * (blow||0) / part.mass; }
+  function blowDamage( damage, part ) { return (part.junk?JUNK_DAMAGE_FACTOR:DAMAGE_FACTOR) * (damage||0) / part.mass; }
 
   function closestPoint( vec, points ) {
     var min = 0, min_dist = Math.abs(vec.x-points[0].x) + Math.abs(vec.y-points[0].y), dist;
@@ -69,8 +74,66 @@ deathmatch.contest = (function() {
         if (child) f( child, arg1, arg2 );
   }
 
+  function sumChild( part, f, arg1, arg2 ) {
+    var sum = 0;
+    if (part.children) 
+      for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
+        if (child) sum += f( child, arg1, arg2 );
+    return sum;
+  }
+
+  /*
+    pairOpponents( population, matchCount ) - create a list of pairs for competition
+    - Assume matchCount does not exceed half the population size.
+    - Assume number of organisms with the same species parent cannot exceed half the population size.
+    - Assume if scores are available, the organisms are sorted. Otherwise, they are shuffled.
+    - Constraint: No organism with the same species parent may be paired.
+    - Constraint: No organism may be paired more than once.
+    - 2*matchCount organisms are moved into the opponent list starting from the begining of the population.
+    -   We keep a count for each species parent encountered. 
+    -   If the count is = matchCount any organisms with that species parent will be skipped.
+    - The first pair is created from the first organism in opponent list and the last compatible organism.
+    -   These are removed from the oppenent list.
+    -   This process is repeated until all the organisms are matched.
+   */
+  function pairOpponents( population, matchCount ) {
+    var speciesParent, speciesCount = {}, participants = [], pairs = [];
+    for (var i=0,organism; participants.length < 2*matchCount && (organism=population[i]); i++) {
+      speciesParent = organism.species.parent || organism.species;
+      if ( (speciesCount[speciesParent.id]||0) + 1 <= matchCount ) {
+        participants.push(organism);
+        speciesCount[speciesParent.id] = (speciesCount[speciesParent.id]||0) + 1;
+      }
+    }
+
+    while ( participants.length > 1 ) {
+      var pair = participants.splice(0,1), 
+          firstSpeciesParent = (pair[0].species.parent || pair[0].species).id;
+      for (var i=participants.length-1, organism; organism=participants[i]; i--) {
+        secondSpeciesParent = (organism.species.parent || organism.species).id;
+        if ( firstSpeciesParent != secondSpeciesParent ) {
+          pair.push( participants.splice(i,1)[0] );
+          break;
+        }
+      }
+      if ( pair.length > 1 )
+        pairs.push(pair);
+    }
+
+    return pairs;
+  }
+
+  /*
+   used as a sorting function to rank organsims after a round of matches
+   */
+  function compareOpponents( opponent1, opponent2 ) {
+    if ( opponent1.wins != opponent2.wins )
+      return opponent2.wins - opponent1.wins;
+    return opponent2.score - opponent1.score;
+  }
+
   function startMatch( leftOrganism, rightOrganism ) {
-    var match = { leftOrganism:leftOrganism, rightOrganism:rightOrganism, junk:{} }
+    var match = { leftOrganism:leftOrganism, rightOrganism:rightOrganism, junk:{} };
     var s = PIXELS_PER_METER;
     match.world = new b2World( new b2Vec2(0, 10),  false );
     match.floorSlope = (.5  + Math.random()) / 10;
@@ -85,6 +148,20 @@ deathmatch.contest = (function() {
     match.rightCreature  = deathmatch.creature.generate( rightOrganism.genome, transform, false, s );
     addPhysics( match.rightCreature, 2, match.world );
 
+    match.leftStats = {
+      health:assessDamage(match.leftCreature),
+      lastPosition:{x:match.leftCreature.origin.x, y:match.leftCreature.origin.y},
+      immobileIterations:0
+    }
+
+    match.rightStats = {
+      health:assessDamage(match.rightCreature),
+      lastPosition:{x:match.rightCreature.origin.x, y:match.rightCreature.origin.y},
+      immobileIterations:0
+    }
+
+    match.iterations = 0;
+
     addContactListeners( match.world );
 
     return match;
@@ -93,11 +170,73 @@ deathmatch.contest = (function() {
   function updateMatch( match ) {
     match.world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
 
-    updateCreature( match.leftCreature, match );
-    updateCreature( match.rightCreature, match );
+    updateCreature( match.leftCreature, match, match.leftStats );
+    updateCreature( match.rightCreature, match, match.rightStats );
     updateJunk( match );
 
-    match.world.ClearForces();    
+    match.world.ClearForces();
+
+    match.iterations++;
+
+    return assessMatch(match);
+  }
+
+  function assessMatch( match ) {
+    if ( match.rightStats.health <= 0.0 ) {
+      match.result = "LEFT KO";
+      match.leftOrganism.wins++;
+      match.leftOrganism.score += score(match.leftStats,match.rightStats, true);
+      return false;
+    }
+    if ( match.leftStats.health <= 0.0 ) {
+      match.result = "RIGHT KO";
+      match.rightOrganism.wins++;
+      match.leftOrganism.score += score(match.rightStats,match.leftStats, true);
+      return false;
+    }
+
+    if ( match.rightStats.immobileIterations >= TKO_ITERATIONS ) {
+      match.result = "LEFT TKO";
+      match.leftOrganism.wins++;
+      return updateScores(match);
+    }
+    if ( match.leftStats.immobileIterations >= TKO_ITERATIONS ) {
+      match.result = "RIGHT TKO";
+      match.rightOrganism.wins++;
+      return updateScores(match);
+    }
+    if ( match.leftStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS 
+      && match.rightStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS ) {
+      match.result = "BOTH IMMOBILE";
+      return updateScores(match); 
+    }
+    if ( match.iterations >= DRAW_ITERATIONS ) {
+      var leftScore = score(match.leftStats,match.rightStats, false);
+      var rightScore = score(match.rightStats,match.leftStats, false);
+      if ( rightScore > leftScore ) {
+        match.result = "RIGHT ON POINTS";
+        match.rightOrganism.wins++;
+      } else if ( leftScore > rightScore ) {
+        match.result = "LEFT ON POINTS";
+        match.leftOrganism.wins++;
+      } else {
+        match.result = "DRAW";
+      }
+      return updateScores(match);
+    }
+    return true;    
+  }
+
+  function updateScores(match) {
+    match.leftOrganism.score += score(match.leftStats,match.rightStats, false);
+    match.rightOrganism.score += score(match.rightStats,match.leftStats, false);
+    return false;
+  }
+
+  function score(organismStats, opponentStats, ko) {
+    var score = Math.max(organismStats.health - opponentStats.health, 0);
+    if (ko) score += KO_BONUS;
+    return score;
   }
 
   function generateCage( match ) {
@@ -227,7 +366,7 @@ deathmatch.contest = (function() {
     return {joint:child.attachment, constant:constant, type:type}
   }
 
-  function updateCreature( creature, match ) {
+  function updateCreature( creature, match, stats ) {
     updatePart(creature);
     for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
       if ( joint.type === 'flex' ) {
@@ -235,7 +374,16 @@ deathmatch.contest = (function() {
         joint.joint.SetMaxMotorTorque( Math.abs(joint.joint.GetJointAngle() * joint.constant) );
       }
     }
-    assessDamage( creature, match );
+    if ( stats ) {
+      stats.health = assessDamage( creature, match );
+      if ( Math.abs( creature.origin.x - stats.lastPosition.x ) > MINIMUM_MOTION ||
+           Math.abs( creature.origin.y - stats.lastPosition.y ) > MINIMUM_MOTION ) {
+        stats.immobileIterations = 0;
+        stats.lastPosition = {x:creature.origin.x, y:creature.origin.y};
+      } else {
+        stats.immobileIterations++;        
+      }
+    }
   }
 
   function updatePart(part) {
@@ -251,10 +399,12 @@ deathmatch.contest = (function() {
     for ( var id in health.blows ) totalDamage += health.blows[id].damage
     health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
 
-    if ( part.health.instant_integrity <= 0 )
+    if ( part.health.instant_integrity <= 0 ) {
       junkify( part, match );
+      return 0;
+    }
 
-    eachChild( part, assessDamage, match );
+    return health.instant_integrity * part.mass + sumChild( part, assessDamage, match );
   }
 
   function junkify( part, match ) {
@@ -358,9 +508,11 @@ deathmatch.contest = (function() {
     PIXELS_PER_METER : PIXELS_PER_METER,
     cageParameters : cageParameters,
     startMatch : startMatch,
+    updateCreature: updateCreature,
     updateMatch : updateMatch,
     addPhysics : addPhysics,
-    updateCreature : updateCreature
+    compareOpponents: compareOpponents,
+    pairOpponents: pairOpponents
   }
 })();
 

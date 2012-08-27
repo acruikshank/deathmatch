@@ -1,0 +1,120 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Evolve</title>
+  <style type="text/css">
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%;}
+      #header                 { padding-left: 30px; }
+      #header span            { display:inline-block; width: 40px; text-align: center; }
+      #drop:hover             { cursor:pointer; }
+      #display                { display: block; width:800px; margin: 50px auto 0; }
+
+  </style>
+  <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script language="javascript">
+
+  var POPULATION_SIZE = 64;
+  var SPECIES_SIZE = 12;
+  var match, pairs, runInterval, roundSize, population;
+
+  function el(id) { return document.getElementById(id); }
+
+  function shuffle(ar) {
+    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
+  }
+
+  function startTournament() {
+    population = [];
+    while ( population.length < POPULATION_SIZE )
+      population = population.concat( deathmatch.creature.newSpecies( Math.min(SPECIES_SIZE, POPULATION_SIZE-population.length) ) );
+
+    // initialize stats
+    for ( var i=0, l=population.length; i<l; i++ ) {
+      population[i].wins = 0;
+      population[i].score = 0;
+    }
+    
+    shuffle( population );
+    roundSize = POPULATION_SIZE/2;
+    pairs = deathmatch.contest.pairOpponents( population, roundSize );
+
+    nextMatch();
+  }
+
+  function nextRound() {
+    if ( roundSize < 2 )
+      return;
+
+    roundSize /= 2;
+    console.log("ROUND", roundSize);
+
+    population.sort( deathmatch.contest.compareOpponents );
+    pairs = deathmatch.contest.pairOpponents( population, roundSize );
+
+    nextMatch();
+  }
+
+  function nextMatch() {
+    var pair = pairs.splice(0,1)[0];
+    match = deathmatch.contest.startMatch( pair[0], pair[1] );
+    play();
+  }
+
+  function play() {
+    runInterval = setInterval(function(){
+      updateMatch();
+    }, 1000/60);    
+  }
+
+  function updateMatch() {
+    if ( ! deathmatch.contest.updateMatch( match ) ) {
+      clearInterval(runInterval);
+      runInterval = null;
+      matchComplete();
+    }
+
+    var ctx = el('display').getContext('2d');
+
+    ctx.fillStyle = 'rgba(52,82,122,.4)';
+    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+    deathmatch.render.renderCanvas(ctx, match);
+  }
+
+  function matchComplete() {
+    console.log("MATCH COMPLETE", match.result, match.iterations);
+    console.log(match.leftOrganism.score,match.leftOrganism.wins,match.rightOrganism.score,match.rightOrganism.wins)
+    if ( ! pairs.length )
+      return nextRound();
+    nextMatch();
+  }
+
+  function init() {
+
+    document.onkeypress = function(e) { 
+      if (e.keyCode == 32) {
+        if ( runInterval ) {
+          clearInterval(runInterval); 
+          runInterval = null;
+        }
+        else play();
+      }
+    }
+
+    startTournament();
+  }
+
+  </script>
+</head>
+<body onload="init()">
+<div id="player">
+  <canvas id="display" width="800" height="500"></canvas>
+</div>
+</body>
+</html>

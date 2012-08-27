@@ -160,6 +160,28 @@ deathmatch.creature = (function() {
     return creature;
   }
 
+  function newSpecies( members ) {
+    var species = { id: randId(), parent: null };
+    var adam = randomOrganism( species ), eve = randomOrganism( species );
+    var organisms = [];
+    for (var i=0; i<members; i++)
+      organisms.push( breedOrganisms(adam, eve) );
+    return organisms;
+  }
+
+  function randomOrganism( species ) {
+    return { species:species, genome:randomGenome(), generation:0 };
+  }
+
+  function breedOrganisms( organism1, organism2 ) {
+    if ( organism1.species.id != organism2.species.id )
+      throw new Error( "attempt to breed organisms of different species" );
+    return { 
+      species:organism1.species, 
+      genome:recombine(organism1.genome,organism2.genome), 
+      generation: Math.max(organism1.generation, organism2.generation)
+    }
+  }
 
   function randomGenome() {
     var genome = [];
@@ -189,6 +211,9 @@ deathmatch.creature = (function() {
       CHROMOSOME_DELETION = .1 * GENERAL_MUTATION_RATE;
 
   function coinFlip() { return Math.random() < .5; }
+  function randInt() { return (2*Math.random()-1)*(1<<32); }
+  function randId() { var id=[],c='abcdefghijklmnopqrstuvwxyz0123456789A'.split(''); 
+                      for (var i=0;i<15; i++) id.push(randItem(c)); return id.join('') }
   function eventOccurance(probability) { return Math.random() < probability; }
   function randIndex(ar) { return (Math.random() * ar.length)|0; }
   function randItem(ar) { return ar[randIndex(ar)]; }
@@ -325,6 +350,7 @@ deathmatch.creature = (function() {
   }
 
   return {
+    newSpecies: newSpecies,
     generate: generate,
     randomGenome : randomGenome,
     recombine : recombine,

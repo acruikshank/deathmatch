@@ -39,12 +39,19 @@ function init() {
     var ITERATIONS = 30000;
     var BOTTOM = 590;
     var BULLET = { x:200, y:300, vx:0, vy:0, leftFacing:false, genome: 
-[{"tak":0.138, "giv":0.898, "obl":0.935, "ext":0.660, "ang":0.801, "flx":0.987, "chd":[2,1,0]}]
-          }
+
+
+[{"tak":0.587, "giv":0.619, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[2,2,1]},
+ {"obl":0.140, "giv":0.880, "ext":1.000, "tak":0.765, "ang":0.300, "flx":0.000, "chd":[6,1,5]},
+ {"obl":0.500, "giv":0.500, "ext":0.805, "tak":0.105, "ang":0.495, "flx":0.000, "chd":[3,4,4]}]
+           }
     var TARGET = { x:600, y:300, vx:0, vy:0, leftFacing:true, genome : 
-[{"obl":0.505, "giv":0.820, "ext":0.500, "tak":1.000, "ang":0.250, "flx":0.605, "chd":[1,1,1,1,1,1,1]},
- {"obl":0.200, "giv":0.525, "ext":0.000, "tak":1.000, "ang":1.000, "flx":0.960, "chd":[3,6,3]}]
-         }
+
+[{"tak":0.587, "giv":0.604, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[1,1,1,3,1,1]},
+ {"obl":0.500, "giv":0.275, "ext":0.655, "tak":0.085, "ang":0.500, "flx":1.000, "chd":[4,4,4,5,2,4,4,4,4,4]},
+ {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.500, "ang":0.525, "flx":0.500, "chd":[4,4,4]},
+ {"obl":0.150, "giv":0.860, "ext":1.000, "tak":0.995, "ang":0.500, "flx":0.000, "chd":[4,3,4]}]
+          }
 
     var match;
     var debug = false;
@@ -77,6 +84,17 @@ WHIP
 SNAKE
 [{"tak":0.091, "giv":0.945, "obl":0.000, "ext":0.052, "ang":0.864, "flx":0.008, "chd":[4,3,3,0]},
  {"tak":0.834, "giv":0.388, "obl":0.079, "ext":0.788, "ang":0.264, "flx":0.180, "chd":[0,1,3]}]
+
+OONA
+[{"tak":0.587, "giv":0.619, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[2,2,1]},
+ {"obl":0.140, "giv":0.880, "ext":1.000, "tak":0.765, "ang":0.300, "flx":0.000, "chd":[6,1,5]},
+ {"obl":0.500, "giv":0.500, "ext":0.805, "tak":0.105, "ang":0.495, "flx":0.000, "chd":[3,4,4]}]
+
+ADA
+[{"tak":0.587, "giv":0.604, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[1,1,1,3,1,1]},
+ {"obl":0.500, "giv":0.275, "ext":0.655, "tak":0.085, "ang":0.500, "flx":1.000, "chd":[4,4,4,5,2,4,4,4,4,4]},
+ {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.500, "ang":0.525, "flx":0.500, "chd":[4,4,4]},
+ {"obl":0.150, "giv":0.860, "ext":1.000, "tak":0.995, "ang":0.500, "flx":0.000, "chd":[4,3,4]}]
  */
 
 
@@ -111,7 +129,10 @@ SNAKE
 
     var count = 0, joint;
     function physicsUpdate() {
-      deathmatch.contest.updateMatch( match );
+      if ( ! deathmatch.contest.updateMatch( match ) ) {
+        console.log("OVER");
+        clearInterval(interval);
+      }
 
       var ctx = el('display').getContext('2d');
 
@@ -123,10 +144,6 @@ SNAKE
       deathmatch.render.renderCanvas(ctx, match);
 
       count++
-
-      if ( match.leftCreature.junk || match.rightCreature.junk ) {
-        clearInterval(interval);
-      }
     }
 
     function startMatch() {
