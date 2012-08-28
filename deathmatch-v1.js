@@ -8,7 +8,7 @@ deathmatch.contest = (function() {
   var TKO_ITERATIONS = 100;
   var BOTH_IMMOBILE_ITERATIONS = 50;
   var KO_BONUS = 25;
-  var DRAW_ITERATIONS = 1000;
+  var DRAW_ITERATIONS = 500;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
   var MAX_DRIVER_SPEED = 10, MIN_DRIVER_SPEED = .5;

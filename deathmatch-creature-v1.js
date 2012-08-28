@@ -242,7 +242,7 @@ deathmatch.creature = (function() {
   }
 
   var EDGE_SLOPE = 5,
-      GENERAL_MUTATION_RATE = .02;
+      GENERAL_MUTATION_RATE = .1;
       TRAIT_SNP = .4 * GENERAL_MUTATION_RATE,
       CHILD_SNP = .75 * GENERAL_MUTATION_RATE,
       TRAIT_SHIFT = .02 * GENERAL_MUTATION_RATE,
