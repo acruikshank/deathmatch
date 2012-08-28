@@ -160,6 +160,48 @@ deathmatch.creature = (function() {
     return creature;
   }
 
+  function bounds( part, genome, dimensions ) {
+    var s = deathmatch.contest.PIXELS_PER_METER;
+
+
+    genome = genome || part.genome;
+    var type = genome[part.type], sides = type.chd.length, half_angle = Math.PI / sides;
+
+    var t = new T();
+    t.scale( 1/s, 1/s );
+    t.translate( part.origin.x, part.origin.y );
+    t.rotate( part.theta );
+    t.scale( part.oblong, 1 / part.oblong );
+
+    var p = t.project({x:0, y:0});
+    dimensions = dimensions || {x:p.x, y:p.y, width:0, height:0};
+
+    for (var i=0; i < sides; i++) {
+      var p = t.project( {x:0, y:part.r * s})
+      if ( p.x < dimensions.x ) {
+        dimensions.width += dimensions.x - p.x;
+        dimensions.x = p.x;
+      }
+      if ( p.y < dimensions.y ) {
+        dimensions.height += dimensions.y - p.y;
+        dimensions.y = p.y;
+      }
+      if ( dimensions.x + dimensions.width < p.x )
+        dimensions.width = p.x - dimensions.x;
+      if ( dimensions.y + dimensions.height < p.y )
+        dimensions.height = p.y - dimensions.y;
+      t.rotate( 2*half_angle );
+    }
+
+    if (part.children) {
+      for ( var i=0,c=part.children,l=c.length,child; child=c[i], i<l; i++ ) {
+        if (child) bounds( child, genome, dimensions );
+      }
+    }
+    return dimensions;
+  }
+
+
   function newSpecies( members ) {
     var species = { id: randId(), parent: null };
     var adam = randomOrganism( species ), eve = randomOrganism( species );
@@ -352,7 +394,9 @@ deathmatch.creature = (function() {
   return {
     newSpecies: newSpecies,
     generate: generate,
+    bounds: bounds,
     randomGenome : randomGenome,
+    breedOrganisms : breedOrganisms,
     recombine : recombine,
     T: T
   }

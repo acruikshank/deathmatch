@@ -10,7 +10,56 @@
       #header                 { padding-left: 30px; }
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
-      #display                { display: block; width:800px; margin: 50px auto 0; }
+      #display                { display: block; width:800px; margin: 20px auto 0; }
+      .round { 
+        clear:left; padding-left: 40px; width: 1024px; margin: 20px auto; position: relative;
+        min-height: 75px; text-align: center;
+      }
+      #generation {
+        display: block;
+        margin:0 auto;
+        padding: 0;
+        width: 800px;
+        padding:0;
+        font-family: 'Helvetica';
+        font-size:45px; 
+        color: #eee; 
+        font-weight: bold;
+        text-shadow: 0 0 1px #000;
+        text-align: center;      
+      }
+      .pair { 
+        display: inline-block; 
+        width: 88px;
+        margin: 10px 10px 0;
+        padding: 5px 0 5px 10px;
+        border: 1px solid transparent;
+      }
+      .pair.active {
+        background: rgba(255,255,0,.25);
+        border: 1px solid rgba(255,255,0,.5);
+      }
+      .pair.complete {
+        opacity: .25;
+      }
+      .pair .organism { 
+        display: inline-block; width: 34px; margin-right: 10px;
+      }
+      .pair canvas { width:34px; border: 1px solid #b3b3b3; }
+      .round-index { font-family: 'Helvetica'; font-size:60px; color: #d9d9d9; font-weight: bold;
+                     text-shadow: 0 0 1px #000; position: absolute; left: 0; top: 0; }
+
+      .round4 .pair { width:172px;  margin-left: 20px; }
+      .round4 .organism { width:68px; }
+      .round4 canvas { width:68px; }
+
+      .round5 .pair { width:220px;  margin-left: 40px; }
+      .round5 .organism { width:100px; }
+      .round5 canvas { width:100px; }
+
+      .round6 .pair { width:220px;  margin-left: 40px; }
+      .round6 .organism { width:100px; }
+      .round6 canvas { width:100px; }
 
   </style>
   <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
@@ -20,20 +69,33 @@
   <script language="javascript">
 
   var POPULATION_SIZE = 64;
-  var SPECIES_SIZE = 12;
-  var match, pairs, runInterval, roundSize, population;
+  var SPECIES_SIZE = 8;
+  var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex, generationIndex = 1;
 
   function el(id) { return document.getElementById(id); }
+  function gen( name, clss, atts ) {
+    var el = document.createElement(name), out={};
+    if ( typeof clss == 'object' ) atts=clss, clss=null;
+    for (var att in atts) el.setAttribute(att,atts[att]);
+    if ( clss ) el.setAttribute('class', clss);
+    out.add = function(node) { return el.appendChild( node.el ? node.el() : node ), out; };
+    out.text = function(txt) { return el.appendChild( document.createTextNode(txt) ), out };
+    out.el = function() { return el; };
+    return out;
+  }
 
   function shuffle(ar) {
     for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
   }
 
-  function startTournament() {
+  function initializeTournament() {
     population = [];
     while ( population.length < POPULATION_SIZE )
       population = population.concat( deathmatch.creature.newSpecies( Math.min(SPECIES_SIZE, POPULATION_SIZE-population.length) ) );
+    startTournament();
+  }
 
+  function startTournament() {
     // initialize stats
     for ( var i=0, l=population.length; i<l; i++ ) {
       population[i].wins = 0;
@@ -44,23 +106,78 @@
     roundSize = POPULATION_SIZE/2;
     pairs = deathmatch.contest.pairOpponents( population, roundSize );
 
+    roundIndex = 1;
+    matchIndex = 0;
+    el('rounds').innerHTML = 0;
+    el('generation').innerHTML = 'Generation ' + generationIndex;
+    renderRound( roundIndex, pairs );
     nextMatch();
+  }
+
+  function nextGeneration() {
+    population = deathmatch.contest.nextGeneration(population);
+    generationIndex++;
+    startTournament();
   }
 
   function nextRound() {
     if ( roundSize < 2 )
-      return;
+      return nextGeneration();
 
     roundSize /= 2;
-    console.log("ROUND", roundSize);
 
     population.sort( deathmatch.contest.compareOpponents );
     pairs = deathmatch.contest.pairOpponents( population, roundSize );
 
+    roundIndex++;
+    matchIndex = 0;
+    renderRound( roundIndex, pairs );
+
     nextMatch();
   }
 
+  function renderRound( roundIndex, pairs ) {
+    var rounds = el('rounds');
+    var round = gen('div', 'round round'+roundIndex).add(gen('span','round-index').text(7-roundIndex));
+    for ( var i=0,pair; pair = pairs[i]; i++ )
+      round.add( gen('div', 'pair', {id:'pair-'+roundIndex+'-'+i} ).add(
+        gen('div','organism',{id:'org-'+roundIndex+'-'+i+'-0'})
+          .add( gen('canvas', {id:'cvs-'+roundIndex+'-'+i+'-0', width:200, height:200 }))
+          .add( gen('div','stats', {id:'stats-'+roundIndex+'-'+i+'-0'}) )
+      ).add(
+        gen('div','organism',{id:'org-'+roundIndex+'-'+i+'-1'})
+          .add( gen('canvas', {id:'cvs-'+roundIndex+'-'+i+'-1', width:200, height:200 }))
+          .add( gen('div','stats', {id:'stats-'+roundIndex+'-'+i+'-1'}) )
+      ) );
+
+
+    if ( rounds.firstChild )
+      rounds.insertBefore( round.el(), rounds.firstChild );
+    else
+      rounds.appendChild( round.el() );
+
+    for ( var i=0,pair; pair = pairs[i]; i++ ) {
+      renderCreature(el('cvs-'+roundIndex+'-'+i+'-0').getContext('2d'), pair[0].genome )
+      renderCreature(el('cvs-'+roundIndex+'-'+i+'-1').getContext('2d'), pair[1].genome )
+    }
+
+  }
+
+  function renderCreature( ctx, genome ) {
+    var s = deathmatch.contest.PIXELS_PER_METER;
+    var transform = new deathmatch.creature.T().translate( ctx.canvas.width*s/2, ctx.canvas.width*s/2 );
+    var creature = deathmatch.creature.generate( genome, transform, true, s );
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,80,120,.2)';
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    deathmatch.render.renderToFit( creature, ctx );     
+    ctx.restore();      
+  }
+
   function nextMatch() {
+    el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair active');
     var pair = pairs.splice(0,1)[0];
     match = deathmatch.contest.startMatch( pair[0], pair[1] );
     play();
@@ -88,11 +205,17 @@
   }
 
   function matchComplete() {
-    console.log("MATCH COMPLETE", match.result, match.iterations);
-    console.log(match.leftOrganism.score,match.leftOrganism.wins,match.rightOrganism.score,match.rightOrganism.wins)
+    el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair complete');
+    var ctx = el('display').getContext('2d');
+    ctx.font = 'bold 50px Helvetica';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,1)';
+    ctx.fillText(match.result, 400, 200);
     if ( ! pairs.length )
-      return nextRound();
-    nextMatch();
+      return setTimeout( nextRound, 1000 );
+
+    matchIndex++;
+    setTimeout( nextMatch, 1000 );
   }
 
   function init() {
@@ -107,14 +230,16 @@
       }
     }
 
-    startTournament();
+    initializeTournament();
   }
 
   </script>
 </head>
 <body onload="init()">
-<div id="player">
+<div>
+  <h1 id="generation"></h1>
   <canvas id="display" width="800" height="500"></canvas>
+  <div id="rounds"></div>
 </div>
 </body>
 </html>

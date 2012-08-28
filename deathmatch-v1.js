@@ -82,6 +82,24 @@ deathmatch.contest = (function() {
     return sum;
   }
 
+  function nextGeneration( population ) {
+    var bySpecies = {}, next = [];
+    for ( var i=0,organism; organism=population[i]; i++)
+      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
+
+    for ( var id in bySpecies ) {
+      var species = bySpecies[id], speciesNext = [], harem = Math.ceil(species.length / 2);
+      species.sort( compareOpponents );
+      for ( var i=0,a; (a = species[i]) && speciesNext.length < species.length; i++ ) {
+        for (var j=1,b; (b = species[j]) && j <= harem && speciesNext.length < species.length; j++ )
+          speciesNext.push( deathmatch.creature.breedOrganisms(a,b) );
+        harem = Math.ceil(harem/2);
+      }
+      next = next.concat(speciesNext);
+    }
+    return next;
+  }
+
   /*
     pairOpponents( population, matchCount ) - create a list of pairs for competition
     - Assume matchCount does not exceed half the population size.
@@ -511,6 +529,7 @@ deathmatch.contest = (function() {
     updateCreature: updateCreature,
     updateMatch : updateMatch,
     addPhysics : addPhysics,
+    nextGeneration : nextGeneration,
     compareOpponents: compareOpponents,
     pairOpponents: pairOpponents
   }

@@ -39,6 +39,26 @@ deathmatch.render = (function() {
     }
   }
 
+  function renderToFit( creature, ctx ) {
+    var bounds = deathmatch.creature.bounds( creature );
+    if ( ! bounds.width || ! bounds.height ) return;
+    var widthRatio = ctx.canvas.width / bounds.width;
+    var heightRatio = ctx.canvas.height / bounds.height;
+    ctx.save();
+    if ( widthRatio > heightRatio ) {
+      ctx.lineWidth = ctx.lineWidth / heightRatio;
+      ctx.scale( heightRatio, heightRatio );
+      ctx.translate( -bounds.x + (ctx.canvas.width / heightRatio - bounds.width) / 2, -bounds.y );
+    } else {
+      ctx.lineWidth = ctx.lineWidth / widthRatio;
+      ctx.scale( widthRatio, widthRatio );
+      ctx.translate( -bounds.x, -bounds.y + (ctx.canvas.height / widthRatio - bounds.height) / 2 );
+    }
+
+    render(creature,ctx);
+    ctx.restore();
+  }
+
   function renderCage( ctx, match ) {
     var p = deathmatch.contest.cageParameters;
     ctx.save();
@@ -129,6 +149,7 @@ deathmatch.render = (function() {
     render: render,
     renderCage : renderCage,
     renderJunk: renderJunk,
-    renderCanvas: renderCanvas
+    renderCanvas: renderCanvas,
+    renderToFit: renderToFit
 	}
 })()
