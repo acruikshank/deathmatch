@@ -1,0 +1,175 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>breeding test</title>
+  <style type="text/css">
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%; margin: 0; padding:0;}
+      #parents { width: 840px; position:relative; height: 350px; margin: 0 auto; overflow: hidden; }
+      #parents canvas { width: 400px; height: 350px; position:absolute; top:0; }
+      #parent1 { left:0; } #parent2 { right: 0; }
+      textarea { position:absolute; height: 90px; opacity:0; -webkit-transition: opacity .25s linear; border-radius:4px; border:1px solid #fff; background: rgba(0,80,120,.4); color:#fff; padding: 4px; }
+      #parents textarea { height:100px; width:400px; top:10px; }
+      textarea:hover { opacity:1; }
+      #parent1genome { left:0; } #parent2genome { right: 0; }
+      #offspring div { margin: 10px; width: 200px; height:200px; position: relative; display: inline-block; }
+      #offspring { width: 1110px; margin: 0 auto; }
+      #offspring textarea { left: 0; height:50px; width:200px; bottom:0px; }
+
+  </style>
+  <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script language="javascript">
+     var   b2Vec2 = Box2D.Common.Math.b2Vec2
+      , dyn = Box2D.Dynamics, shapes = Box2D.Collision.Shapes, joints = dyn.Joints
+      , b2BodyDef = dyn.b2BodyDef
+      , b2Body = dyn.b2Body
+      , b2FixtureDef = dyn.b2FixtureDef
+      , b2Fixture = dyn.b2Fixture
+      , b2World = dyn.b2World
+      , b2MassData = shapes.b2MassData
+      , b2PolygonShape = shapes.b2PolygonShape
+      , b2CircleShape = shapes.b2CircleShape
+      , b2RevoluteJointDef = joints.b2RevoluteJointDef
+      , b2WeldJointDef = joints.b2WeldJointDef
+      , b2DebugDraw = dyn.b2DebugDraw ;
+    var world, physicsInterval, creature, parent1, parent2, offspring=[];
+
+    function el(id) { return document.getElementById(id); }
+    function childOf(el,clss) { if (! el || el.tagName == 'BODY') return null; return (el.getAttribute('class') === clss ? el : childOf(el.parentNode,clss)); }
+    function offset(el) { if ( el.tagName === 'BODY' ) return {left:0, top:0}; var o = offset(el.offsetParent); return {left:o.left+el.offsetLeft, top:o.top+el.offsetTop}; }
+
+    function output_genome( genome ) {
+      return '[' + genome.map(format_gene).join(',\n ') + ']'
+    }
+
+    function format_gene( gene ) {
+      var out = []; 
+      for (var key in gene) out.push('"'+key+'":'+(key=='chd'?'['+gene[key]+']':gene[key].toFixed(3)));
+      return '{'+out.join(', ')+'}';
+    }
+
+    function init() {
+      generate();
+
+      document.onkeypress = function(e) { if (e.keyCode == 32) generate(); }
+    }
+
+    function generate() {
+      clearInterval(physicsInterval);
+      var parentEl = el('parent1');
+      var ctx1 = parentEl.getContext('2d');
+      parent1 = deathmatch.creature.randomGenome();
+      renderGenome( ctx1, parent1, 1 );
+      el('parent1genome').innerHTML = output_genome(parent1);
+      addOverHandlers( parentEl, parent1, 1 )
+
+      parentEl = el('parent2');
+      var ctx2 = parentEl.getContext('2d');
+      parent2 = parent1; // deathmatch.creature.randomGenome();
+      renderGenome( ctx2, parent2, 1 );
+      el('parent2genome').innerHTML = output_genome(parent2);
+      addOverHandlers( parentEl, parent2, 1 );
+
+      offspring = [];
+      for ( var i=0; i < 10; i++ )
+        offspring.push( deathmatch.creature.recombine(parent1, parent2 ) );
+
+      el('offspring').innerHTML = '';
+      offspring.forEach( function(genome) {
+        var box = document.createElement('DIV');
+        var c = document.createElement('CANVAS');
+        c.setAttribute('width','200');
+        c.setAttribute('height','200');
+        box.appendChild(c);
+        var ta = document.createElement('TEXTAREA');
+        ta.value = output_genome(genome);
+        box.appendChild(ta);
+        el('offspring').appendChild(box);
+        renderGenome( c.getContext('2d'), genome, .5 );
+        addOverHandlers( c, genome, .5 );
+
+      })
+    }
+
+    function addOverHandlers( el, genome, scale ) {
+      el.onmouseover = function() { 
+        startPhysics( genome, el.getContext('2d'), scale );
+        clearInterval(physicsInterval);
+        physicsInterval = setInterval(function() { updatePhysics( el.getContext('2d'), scale ); }, 1000/60);
+      }
+      el.onmouseout = function() {
+        clearInterval(physicsInterval);
+        renderGenome( el.getContext('2d'), genome, scale );
+      }
+    }
+
+    function renderGenome( ctx, genome, scale ) {
+      var s = deathmatch.contest.PIXELS_PER_METER;
+      var transform = new deathmatch.creature.T().translate( 400*s/2, 400*s/2 );
+      var creature = deathmatch.creature.generate( genome, transform, true, s );
+      renderCreature( ctx, creature, scale );
+    }
+
+    function renderCreature( ctx, creature, scale ) {
+      ctx.save();
+      ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      ctx.scale( scale, scale )
+      ctx.fillStyle = 'rgba(0,80,120,.2)';
+      ctx.strokeStyle = 'rgba(255,255,255,.8)';
+      ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      deathmatch.render.render( creature, ctx );     
+      ctx.restore();      
+    }
+
+    function statbox( top, left, right, bottom, scale ) {
+      scale = deathmatch.contest.PIXELS_PER_METER / scale;
+      var bodyDef = new b2BodyDef;
+      bodyDef.type = b2Body.b2_staticBody;
+      bodyDef.position.x = (left + (right-left)/2) * scale;
+      bodyDef.position.y = (bottom + (top-bottom)/2) * scale;
+      var fixDef = new b2FixtureDef;
+      fixDef.density = 1.0;
+      fixDef.friction = 0.5;
+      fixDef.restitution = 0.2;
+      fixDef.shape = new b2PolygonShape;
+      fixDef.shape.SetAsBox((right-left) * scale, (top-bottom) * scale);
+      fixDef.filter.groupIndex = 2;
+      world.CreateBody(bodyDef).CreateFixture(fixDef);
+    }
+
+    function startPhysics( genome, ctx, scale ) {
+      var s = deathmatch.contest.PIXELS_PER_METER;
+      var transform = new deathmatch.creature.T().translate( 400*s/2, 400*s/2 );
+      world = new b2World( new b2Vec2(0, 10),  true );
+      creature = deathmatch.creature.generate( genome, transform, true, s );
+
+      //create ground
+      statbox( ctx.canvas.height, -20, 0, 0, scale );
+      statbox( ctx.canvas.height, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, ctx.canvas.height - 5, scale );
+      statbox( ctx.canvas.height, ctx.canvas.width, ctx.canvas.width + 20, 0, scale );
+      deathmatch.contest.addPhysics( creature, 1, world );
+    }
+
+    function updatePhysics( ctx, scale ) {
+      world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
+      deathmatch.contest.updateCreature(creature);
+      world.ClearForces();
+      renderCreature( ctx, creature, scale );
+    }
+  </script>
+</head>
+<body onload="init()">
+  <div id="parents">  
+    <canvas id="parent1" width="400" height="350"></canvas>
+    <canvas id="parent2" width="400" height="350"></canvas>
+    <textarea id="parent1genome"></textarea>
+    <textarea id="parent2genome"></textarea>
+  </div>
+  <div id="offspring"></div>
+</body>
+</html>

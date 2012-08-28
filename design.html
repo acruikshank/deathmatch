@@ -1,0 +1,302 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>design</title>
+  <meta name="author" content="sivoh">
+  <style type="text/css">
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #000; color:#fff;}
+      #player                 { display:block; float: left; margin-right: 20px; width:600px;  }
+      #controls               { padding: 10px 0 0 0; float: left; z-index:5; }
+      #header                 { padding-left: 30px; }
+      #header span            { display:inline-block; width: 40px; text-align: center; }
+      #types                  { clear:both; margin-top: 10px; width; 600px; padding:0; user-select:none; -webkit-user-select:none;  }
+      .type                   { height: 40px; margin:10px 0 15px; background:#282828; clear:both; width:600px; -webkit-border-radius:3px; }
+      .type .index            { display: inline-block; width:26px; font-size: 1.65em; line-height:40px; text-align: right; vertical-align:top;  }
+      .choose                 { width:40px; display: inline-block; margin-left:4px; }
+      .outer                  { width: 9px; height: 40px; margin: 0 15px; background:#000;
+                                border:solid #ccc; border-width: 0 1px; position: relative; cursor:ns-resize; }
+      .inner                  { width: 5px; margin: auto 2px 0; background:#dd5; position:absolute; bottom:0; }
+      .chd                    { display: inline-block; color:#777; vertical-align: top; line-height:40px; font-size: 1.2em; }
+      .chd .delete, .chd .add { color: #404040; }
+      .chd-index              { color: #fff; margin: 0 5px; position:relative; }
+      .chd-index .up          { color: #404040; font-size:.2em; position:absolute; top:-27px; left:0; }
+      .chd-index .down          { color: #404040; font-size:.2em; position:absolute; top:4px; left:0; }
+      .delete-type            { display: inline-block; float:right; font-size:1.2em; margin:5px 5px 0 0; color:#777; }
+      .add-type               { display: inline-block; width:26px; font-size: 1.65em; line-height:20px; text-align: right; vertical-align:top; color:#777; }
+      .chd-index .up:hover, .chd-index .down:hover, .add:hover, .delete:hover, .delete-type:hover, .add-type:hover { color:#fff; cursor: pointer; }
+      #trait                  { display:none; position: absolute; z-index:1; width: 80px; text-align: right; font-size:2.5em; 
+                                background:rgba(0,0,0,.6); border-radius:5px; border:1px solid rgba(255,255,255,.5); padding: 5px;; }
+      #drop:hover, #reset:hover, #flip:hover { cursor:pointer; color: #ff0; }
+      #export { position: fixed; bottom: -300px; right:0; height: 320px; width:600px; -webkit-transition: bottom .5s ease;}
+      #export label { position:absolute; display:block; right:10px; top:0; border-radius: 4px 4px 0 0; background-color:#333; 
+                      height: 12px; padding: 4px 8px 4px 8px; cursor:pointer; }
+      #export div { position:absolute; top:20px; right:0; width:600px; height:280px; padding: 10px; 
+                         background-color:#333; border:none; border-radius: 4px 0 0 0; }
+      #export textarea { width:580px; height:220px; padding: 10px; 
+                         background-color:#222; border:1px solid black; font-size:12px; color: #ccc; border-radius: 4px; }
+      #export button { position: absolute; bottom: 10px; right: 10px; cursor:pointer; } 
+
+  </style>
+  <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+</head>
+<body onload="init()">
+<div id="player">
+  <canvas id="display" width="600" height="600"></canvas>
+  <span id="drop">&#x25bA; DROP</span>
+  <span id="reset">&#x25C6; RESET</span>
+  <span id="flip">RIGHT</span>
+</div>
+<div id="controls">
+  <div id="header">
+    <span>tak</span>
+    <span>giv</span>
+    <span>ang</span>
+    <span>ext</span>
+    <span>obl</span>
+    <span>flx</span>
+    <span>chd</span>
+  </div>
+  <div id="types"> </div>
+</div>
+<div id="trait">23%</div>
+<div id="export"><label id="export-label">import / export</label><div><textarea id="genome"></textarea><button id="import">import</button></div></div>
+  <script language="javascript">
+     var   b2Vec2 = Box2D.Common.Math.b2Vec2
+      , dyn = Box2D.Dynamics, shapes = Box2D.Collision.Shapes, joints = dyn.Joints
+      , b2BodyDef = dyn.b2BodyDef
+      , b2Body = dyn.b2Body
+      , b2FixtureDef = dyn.b2FixtureDef
+      , b2Fixture = dyn.b2Fixture
+      , b2World = dyn.b2World
+      , b2MassData = shapes.b2MassData
+      , b2PolygonShape = shapes.b2PolygonShape
+      , b2CircleShape = shapes.b2CircleShape
+      , b2RevoluteJointDef = joints.b2RevoluteJointDef
+      , b2WeldJointDef = joints.b2WeldJointDef
+      , b2DebugDraw = dyn.b2DebugDraw ;
+    var PIXELS_PER_METER = deathmatch.contest.PIXELS_PER_METER;
+
+    var ANGULAR_DAMPING = 4;
+    var leftFacing = false;
+
+    var debug = false;
+
+    var genome = [
+      { obl:.5, giv:.9, ext:.5, tak:.5, ang:.5, flx:.5, chd:[3,2,1,3] },
+      { obl:1, giv:.5, ext:1, tak:1, ang:.375, flx:.5, chd:[7,7,7] },
+      { obl:.5, giv:.5, ext:.1, tak:1, ang:.075, flx:.5, chd:[7,7,7] },
+      { obl:.5, giv:.1, ext:.5, tak:.2, ang:.5, flx:.5, chd:[3,3,3,3,3,3,3,3,3] }
+    ];
+
+    var runInterval;
+
+    if ( localStorage.genome )
+      genome = JSON.parse( localStorage.genome );
+    else
+      localStorage.genome = JSON.stringify(genome);
+
+    var world, creature;
+
+    function el(id) { return document.getElementById(id); }
+    function childOf(el,clss) { if (! el || el.tagName == 'BODY') return null; return (el.getAttribute('class') === clss ? el : childOf(el.parentNode,clss)); }
+    function offset(el) { if ( el.tagName === 'BODY' ) return {left:0, top:0}; var o = offset(el.offsetParent); return {left:o.left+el.offsetLeft, top:o.top+el.offsetTop}; }
+
+    function draw() {
+      var ctx = el('display').getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      if (! debug) ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,10,10,.3)';
+      ctx.strokeStyle = 'rgb(255,255,255)';
+      ctx.lineWidth = PIXELS_PER_METER;
+
+      deathmatch.render.render( creature, ctx );
+      ctx.restore();
+    }
+
+    function statbox( top, left, right, bottom ) {
+      var bodyDef = new b2BodyDef;
+      bodyDef.type = b2Body.b2_staticBody;
+      bodyDef.position.x = (left + (right-left)/2) * PIXELS_PER_METER;
+      bodyDef.position.y = (bottom + (top-bottom)/2) * PIXELS_PER_METER;
+      var fixDef = new b2FixtureDef;
+      fixDef.density = 1.0;
+      fixDef.friction = 0.5;
+      fixDef.restitution = 0.2;
+      fixDef.shape = new b2PolygonShape;
+      fixDef.shape.SetAsBox((right-left) * PIXELS_PER_METER, (top-bottom) * PIXELS_PER_METER);
+      fixDef.filter.groupIndex = 2;
+      world.CreateBody(bodyDef).CreateFixture(fixDef);
+    }
+
+    function addPhysics( creature ) {
+      world = new b2World( new b2Vec2(0, 10),  true );
+      var ctx = el("display").getContext("2d");
+
+      //create ground
+      statbox( ctx.canvas.height, -20, 0, 0 );
+      statbox( ctx.canvas.height, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, ctx.canvas.height - 5 );
+      statbox( ctx.canvas.height, ctx.canvas.width, ctx.canvas.width + 20, 0 );
+
+      deathmatch.contest.addPhysics( creature, 1, world );
+
+      //setup debug draw
+      if (debug) {
+        var debugDraw = new b2DebugDraw();
+        ctx.save();
+        debugDraw.SetSprite(ctx);
+        debugDraw.SetDrawScale(1/PIXELS_PER_METER);
+        debugDraw.SetFillAlpha(0.3);
+        debugDraw.SetLineThickness(1.0);
+        debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
+        world.SetDebugDraw(debugDraw);
+        ctx.restore();
+      }
+    }
+
+    function update() {
+      var ctx = el('display').getContext('2d');
+      ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      clearInterval(runInterval);
+      localStorage.genome = JSON.stringify(genome);
+
+      var transform = new deathmatch.creature.T().translate( 
+        el('display').width*PIXELS_PER_METER/2, 
+        el('display').height*PIXELS_PER_METER/2 );
+      creature = deathmatch.creature.generate( genome, transform, leftFacing, PIXELS_PER_METER );
+
+      draw();
+
+      el('types').innerHTML = genome.map(type_template).join('')+et('span','add-type','+');
+      el('genome').value = output_genome(genome);
+    }
+
+    function import_genome() {
+      genome = JSON.parse(el('genome').value);
+      update();
+    }
+
+    function et(name, clss, contents,data,height) { return ['<',name,' class="',clss,'"',(data?' data="'+data+'"':'')
+      ,(height?' style="height:'+height+'px"':''),'>',contents,'</',name,'>'].join(''); }
+
+
+    function type_template( type, index ) {
+      return et('div','type', et('span','index',index)
+      + ['tak','giv','ang','ext','obl','flx'].map(trait_template).join('')
+      + et('div','chd', et('span','delete','-',index+'') + ' [ ' + type.chd.map(chd_template).join(',') + ' ] ' + et('span','add','+',index+'') )
+      + et('span','delete-type','x',index) );
+
+      function trait_template( name ) { return et('div','choose '+name,et('div','outer',et('div','inner','', null, Math.round(40*type[name])), [index,name])); }
+      function chd_template(cindex,slot) { return et('span','chd-index', et('span','up','&#x25b2;')+et('span','chd-display',cindex)+et('span','down','&#x25bC;'),[index,slot] ); }
+    }
+
+    function handleNodes(event, handlers) {
+      var node;
+      for ( var name in handlers ) {
+        node = childOf(event.target,name);
+        if( node ) {
+          handlers[name]( node );
+          update();
+          return;
+        }
+      }
+    }
+
+    function output_genome( genome ) {
+      return '[' + genome.map(format_gene).join(',\n ') + ']'
+    }
+
+    function format_gene( gene ) {
+      var out = []; 
+      for (var key in gene) out.push('"'+key+'":'+(key=='chd'?'['+gene[key]+']':gene[key].toFixed(3)));
+      return '{'+out.join(', ')+'}';
+    }
+
+    function handle_click( event ) {
+      handleNodes( event, {
+        'add':        function(node) { genome[data(node)].chd.push(0); },
+        'delete':     function(node) { var chd = genome[data(node)].chd; if (chd.length>3) chd.pop(); },
+        'up':         function(node) { var cin=childOf(node,'chd-index'),gene=genome[data(cin,0)],ci=data(cin,1);
+                        if (gene.chd[ci] < 9) gene.chd[ci]++; },
+        'down':       function(node) { var cin=childOf(node,'chd-index'),gene=genome[data(cin,0)],ci=data(cin,1);
+                        if (gene.chd[ci] > 0) gene.chd[ci]--; },
+        'delete-type':function(node) { if (genome.length > 1) genome.splice(data(node),1) },
+        'add-type':   function(node) { genome.push({ obl:.5, giv:.5, ext:.5, tak:.5, ang:.5, flx:.5, chd:[0,0,0] }); }
+      } );
+      function data(node,idx) { return parseInt(node.getAttribute('data').split(',')[idx||0]); }
+    }
+
+    function handle_drag( event ) {
+      var node = childOf(event.target,'outer');
+      if ( node ) {
+        var startY = event.clientY;
+        var data = node.getAttribute('data').split(',');
+        var gene = genome[parseInt(data[0])];
+        var trait = data[1];
+        var value = gene[trait];
+        var inner = node.firstChild;
+
+        var pos = offset(node);
+        el('trait').style.display='block';
+        el('trait').style.top = pos.top+'px';
+        el('trait').style.left = (pos.left - 100)+'px';
+        el('trait').innerHTML = Math.round(value*100)+'%';
+        document.onselectstart = function(){ return false; }
+        document.body.style.cursor = 'ns-resize';
+
+        window.onmousemove = function(event) {
+          value = Math.max(Math.min(1, value + (startY - event.clientY)/200),0);
+          gene[trait] = value;
+          update();
+          startY = event.clientY;
+          el('trait').innerHTML = Math.round(value*100)+'%';
+          inner.style.height = Math.round(40*value)+'px';
+        }
+
+        window.onmouseup = function() {
+          gene[trait] = value;
+          update();
+          el('trait').style.display = 'none';
+          window.onmouseup = null;
+          window.onmousemove = null;
+          document.onselectstart = null;
+          document.body.style.cursor = null;
+        }
+      }
+
+    }
+
+    function init() {
+      el('types').onclick = handle_click;
+      el('types').onmousedown = handle_drag;
+      el('drop').onclick = function() { addPhysics(creature); runInterval = setInterval(physicsUpdate, 1000/60); }
+      el('reset').onclick = update;
+      el('export').style.bottom = '-300px'
+      el('export-label').onclick = function() { el('export').style.bottom = parseInt(el('export').style.bottom) ? 0 : '-300px'; }
+      el('import').onclick = import_genome;
+      el('flip').onclick = function() { console.log("flip"); leftFacing = !leftFacing; el('flip').innerHTML=(leftFacing ? 'LEFT' : 'RIGHT'); update(); }
+      update();
+  };
+
+  var count = 0;
+  function physicsUpdate() {
+    world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
+    if (debug) world.DrawDebugData();
+    deathmatch.contest.updateCreature(creature);
+
+    world.ClearForces();
+
+    draw();
+    count++
+  }
+
+  </script>
+</body>
+</html>
