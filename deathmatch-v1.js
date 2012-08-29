@@ -231,10 +231,10 @@ deathmatch.contest = (function() {
     if ( match.iterations >= DRAW_ITERATIONS ) {
       var leftScore = score(match.leftStats,match.rightStats, false);
       var rightScore = score(match.rightStats,match.leftStats, false);
-      if ( rightScore > leftScore ) {
+      if ( rightScore - leftScore > .00001 ) {
         match.result = "RIGHT ON POINTS";
         match.rightOrganism.wins++;
-      } else if ( leftScore > rightScore ) {
+      } else if ( leftScore - rightScore > .00001 ) {
         match.result = "LEFT ON POINTS";
         match.leftOrganism.wins++;
       } else {

@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Evolve</title>
   <style type="text/css">
-      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%;}
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%; margin:0; }
       #header                 { padding-left: 30px; }
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
@@ -17,15 +17,15 @@
       }
       #generation {
         display: block;
-        margin:0 auto;
+        margin: 15px auto 0;
         padding: 0;
         width: 800px;
         padding:0;
         font-family: 'Helvetica';
-        font-size:45px; 
-        color: #eee; 
+        font-size:30px; 
+        color: #d9d9d9; 
         font-weight: bold;
-        text-shadow: 0 0 1px #000;
+        text-shadow: 0 0 6px #999;
         text-align: center;      
       }
       .pair { 
@@ -47,7 +47,7 @@
       }
       .pair canvas { width:34px; border: 1px solid #b3b3b3; }
       .round-index { font-family: 'Helvetica'; font-size:60px; color: #d9d9d9; font-weight: bold;
-                     text-shadow: 0 0 1px #000; position: absolute; left: 0; top: 0; }
+                     text-shadow: 0 0 4px #999; position: absolute; left: 0; top: 0; }
 
       .round4 .pair { width:172px;  margin-left: 20px; }
       .round4 .organism { width:68px; }
@@ -71,6 +71,7 @@
   var POPULATION_SIZE = 64;
   var SPECIES_SIZE = 8;
   var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex, generationIndex = 1;
+  var accelerated = false;
 
   function el(id) { return document.getElementById(id); }
   function gen( name, clss, atts ) {
@@ -157,8 +158,14 @@
       rounds.appendChild( round.el() );
 
     for ( var i=0,pair; pair = pairs[i]; i++ ) {
-      renderCreature(el('cvs-'+roundIndex+'-'+i+'-0').getContext('2d'), pair[0].genome )
-      renderCreature(el('cvs-'+roundIndex+'-'+i+'-1').getContext('2d'), pair[1].genome )
+      var cvs = el('cvs-'+roundIndex+'-'+i+'-0');
+      cvs.setAttribute('height', cvs.offsetHeight * 2);
+      cvs.setAttribute('width', cvs.offsetWidth * 2);
+      renderCreature(cvs.getContext('2d'), pair[0].genome )
+      cvs = el('cvs-'+roundIndex+'-'+i+'-1');
+      cvs.setAttribute('height', cvs.offsetHeight * 2);
+      cvs.setAttribute('width', cvs.offsetWidth * 2);
+      renderCreature(cvs.getContext('2d'), pair[1].genome )
     }
 
   }
@@ -184,9 +191,11 @@
   }
 
   function play() {
-    runInterval = setInterval(function(){
-      updateMatch();
-    }, 1000/60);    
+    if ( ! runInterval) {
+      runInterval = setInterval(function(){
+        updateMatch();
+      }, accelerated ? 1 : 1000/60 );
+    }
   }
 
   function updateMatch() {
@@ -196,15 +205,26 @@
       matchComplete();
     }
 
-    var ctx = el('display').getContext('2d');
+    if ( ! accelerated ) {
+      var ctx = el('display').getContext('2d');
 
-    ctx.fillStyle = 'rgba(52,82,122,.4)';
-    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      ctx.fillStyle = 'rgba(52,82,122,.4)';
+      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
 
-    deathmatch.render.renderCanvas(ctx, match);
+      deathmatch.render.renderCanvas(ctx, match);
+    }
   }
 
   function matchComplete() {
+    if ( accelerated ) {
+      var ctx = el('display').getContext('2d');
+
+      ctx.fillStyle = 'rgba(52,82,122,1)';
+      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+      deathmatch.render.renderCanvas(ctx, match);
+    }
+
     el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair complete');
     var ctx = el('display').getContext('2d');
     ctx.font = 'bold 50px Helvetica';
@@ -212,21 +232,23 @@
     ctx.fillStyle = 'rgba(255,255,255,1)';
     ctx.fillText(match.result, 400, 200);
     if ( ! pairs.length )
-      return setTimeout( nextRound, 1000 );
+      return setTimeout( nextRound, accelerated ? 1 : 1000 );
 
     matchIndex++;
-    setTimeout( nextMatch, 1000 );
+    setTimeout( nextMatch, accelerated ? 1 : 1000 );
   }
 
   function init() {
 
     document.onkeypress = function(e) { 
       if (e.keyCode == 32) {
+        accelerated = !accelerated;
         if ( runInterval ) {
-          clearInterval(runInterval); 
+          clearInterval(runInterval);
           runInterval = null;
         }
-        else play();
+        play();
+        return false;
       }
     }
 

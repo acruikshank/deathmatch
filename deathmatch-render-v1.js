@@ -100,19 +100,20 @@ deathmatch.render = (function() {
   }
 
   function drawDamage( part, ctx, left ) {
+    var size = .2;
     var s = deathmatch.contest.PIXELS_PER_METER;
     ctx.save();
     ctx.scale( 1/s, 1/s );
     ctx.lineWidth = s;
     ctx.beginPath();
-    ctx.arc( part.origin.x, part.origin.y, .4*part.mass*s, 0, 2*Math.PI, true );
+    ctx.arc( part.origin.x, part.origin.y, size*part.mass*s, 0, 2*Math.PI, true );
     ctx.fillStyle = left ? '#00f' : '#0d0';
     ctx.fill();
     ctx.fillStyle = ctx.strokeStyle = '#fff'; 
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc( part.origin.x, part.origin.y, .4*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
+    ctx.arc( part.origin.x, part.origin.y, size*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
     ctx.fill(); i
     ctx.restore();
     eachChild( part, drawDamage, ctx, left );
