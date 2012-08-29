@@ -4,7 +4,7 @@ deathmatch.contest = (function() {
 
   var DAMAGE_FACTOR = 25;
   var JUNK_DAMAGE_FACTOR = 10;
-  var MINIMUM_MOTION = .02;
+  var MINIMUM_MOTION = .1;
   var TKO_ITERATIONS = 100;
   var BOTH_IMMOBILE_ITERATIONS = 50;
   var KO_BONUS = 25;
@@ -231,10 +231,10 @@ deathmatch.contest = (function() {
     if ( match.iterations >= DRAW_ITERATIONS ) {
       var leftScore = score(match.leftStats,match.rightStats, false);
       var rightScore = score(match.rightStats,match.leftStats, false);
-      if ( rightScore > leftScore ) {
+      if ( rightScore - leftScore > .00001 ) {
         match.result = "RIGHT ON POINTS";
         match.rightOrganism.wins++;
-      } else if ( leftScore > rightScore ) {
+      } else if ( leftScore - rightScore > .00001 ) {
         match.result = "LEFT ON POINTS";
         match.leftOrganism.wins++;
       } else {

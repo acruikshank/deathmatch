@@ -37,11 +37,26 @@ filled either by spliting an existing species (which might solve the speciation 
 reduce divesity) or generating a new random species (which would increase diversity but
 muddle the concept of generational age).
 
+August 29, 2012
+--------------
+I increased the mutation rates and also implemented a switch that turns off rendering and
+speeds performs more physics calculations per second. This permits a 10 fold increase in
+the number of generations computed in a given time. Unfortunately, there is a bug that
+causes the app to crash, so the overnight tests didn't yield results. I have watched a few
+simulations up to 20 generations. They were much more interesting than the previous one. The
+creatures started off mostly immobile and gradually grew more dangerous. In one simulation,
+it took about 10 generations before any of the creatures really started to harm each other
+(there generation started off with mostly neutral flex values). Once the creatures did start
+attacking, there were a variety of strategies which made the contest very interesting. In
+another simulation, some creatures were acheiving knockouts after only 4 generations. These
+were snakes, and by 20 generations the snakes were dominant.
+
+No more progress on speciation.
+
 TODO:
 
 1. Some way of persisting simulation.
-2. Reduce match length
-3. Increase mutation rates.
+2. Fix match pairing algorithm
 4. Disqualify creatures with too many parts or that exceed certain bounds.
 5. Info on current opponents.
 6. Species analysis tools.
