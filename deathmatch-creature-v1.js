@@ -201,6 +201,13 @@ deathmatch.creature = (function() {
     return dimensions;
   }
 
+  function parts( part ) {
+    var count = 1;
+    if (part.children)
+      for ( var i=0,c=part.children,l=c.length,child; child=c[i], i<l; i++ )
+        if (child) count += parts( child );
+    return count;
+  }
 
   function newSpecies( members ) {
     var species = { id: randId(), parent: null };
@@ -395,6 +402,7 @@ deathmatch.creature = (function() {
     newSpecies: newSpecies,
     generate: generate,
     bounds: bounds,
+    parts: parts,
     randomGenome : randomGenome,
     breedOrganisms : breedOrganisms,
     recombine : recombine,

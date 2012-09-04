@@ -71,7 +71,9 @@
   var POPULATION_SIZE = 64;
   var SPECIES_SIZE = 8;
   var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex, generationIndex = 1;
+  var matchTimeout, simulation, generation, round;
   var accelerated = false;
+  var state = 'PRE_TOURNAMENT';
 
   function el(id) { return document.getElementById(id); }
   function gen( name, clss, atts ) {
@@ -93,10 +95,15 @@
     population = [];
     while ( population.length < POPULATION_SIZE )
       population = population.concat( deathmatch.creature.newSpecies( Math.min(SPECIES_SIZE, POPULATION_SIZE-population.length) ) );
+    for ( var i=0, organism; organism = population[i]; i++ )
+      organism.index = i;
     startTournament();
   }
 
   function startTournament() {
+    generation = {population:population, rounds:[]}
+    round = [];
+
     // initialize stats
     for ( var i=0, l=population.length; i<l; i++ ) {
       population[i].wins = 0;
@@ -109,8 +116,8 @@
 
     roundIndex = 1;
     matchIndex = 0;
-    el('rounds').innerHTML = 0;
     el('generation').innerHTML = 'Generation ' + generationIndex;
+    el('rounds').innerHTML = '';
     renderRound( roundIndex, pairs );
     nextMatch();
   }
@@ -122,8 +129,16 @@
   }
 
   function nextRound() {
-    if ( roundSize < 2 )
+    round = [];
+
+    if ( roundSize < 2 ) {
+      simulation.lastGeneration = generationIndex;
+      if ( window.localStorage ) {
+        localStorage.simulation = JSON.stringify(simulation);
+        localStorage['generation-'+generationIndex] = JSON.stringify(generation);
+      }
       return nextGeneration();
+    }
 
     roundSize /= 2;
 
@@ -187,14 +202,22 @@
     el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair active');
     var pair = pairs.splice(0,1)[0];
     match = deathmatch.contest.startMatch( pair[0], pair[1] );
+    if ( match.result ) // immediate disqualification
+      return matchComplete();
+
+    state = 'IN_MATCH';
     play();
   }
 
   function play() {
-    if ( ! runInterval) {
+    if ( state == 'IN_MATCH' ) {
       runInterval = setInterval(function(){
         updateMatch();
       }, accelerated ? 1 : 1000/60 );
+    } else if ( state == 'PRE_ROUND' ) {
+      nextRound();
+    } else if ( state == 'PRE_MATCH' ) {
+      nextMatch();
     }
   }
 
@@ -216,9 +239,16 @@
   }
 
   function matchComplete() {
-    if ( accelerated ) {
-      var ctx = el('display').getContext('2d');
+    round.push( deathmatch.contest.matchSummary(match) );
 
+    var ctx = el('display').getContext('2d');
+    
+    if ( accelerated ) {
+      ctx.fillStyle = 'rgba(52,82,122,1)';
+      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+      deathmatch.render.renderCanvas(ctx, match);
+    } else if ( match.iterations == 0 ) {
       ctx.fillStyle = 'rgba(52,82,122,1)';
       ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
 
@@ -231,11 +261,15 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,1)';
     ctx.fillText(match.result, 400, 200);
-    if ( ! pairs.length )
-      return setTimeout( nextRound, accelerated ? 1 : 1000 );
+    if ( ! pairs.length ) {
+      generation.rounds.push(round);
+      state = 'PRE_ROUND';
+      return matchTimeout = setTimeout( nextRound, accelerated ? 1 : 1000 );
+    }
 
     matchIndex++;
-    setTimeout( nextMatch, accelerated ? 1 : 1000 );
+    state = 'PRE_MATCH';
+    matchTimeout = setTimeout( nextMatch, accelerated ? 1 : 1000 );
   }
 
   function init() {
@@ -243,16 +277,24 @@
     document.onkeypress = function(e) { 
       if (e.keyCode == 32) {
         accelerated = !accelerated;
-        if ( runInterval ) {
-          clearInterval(runInterval);
-          runInterval = null;
-        }
+        clearInterval(runInterval);
+        clearTimeout(matchTimeout);
+        runInterval = null;
+        matchTimeout = null;
         play();
         return false;
       }
     }
 
-    initializeTournament();
+    if ( window.localStorage && localStorage.simulation ) {
+      simulation = JSON.parse(localStorage.simulation);
+      population = JSON.parse(localStorage['generation-' + simulation.lastGeneration]).population;
+      generationIndex = simulation.lastGeneration;
+      nextGeneration();
+    } else {
+      simulation = {firstGeneration:1, lastGeneration:1}
+      initializeTournament();
+    }
   }
 
   </script>

@@ -1,5 +1,9 @@
 deathmatch = (window.deathmatch || {});
 deathmatch.contest = (function() {
+  /* TODO:
+     Separate out physics related function (including damage) into deathmatch-physics
+     */
+
   var PIXELS_PER_METER = .01;
 
   var DAMAGE_FACTOR = 25;
@@ -8,6 +12,7 @@ deathmatch.contest = (function() {
   var TKO_ITERATIONS = 100;
   var BOTH_IMMOBILE_ITERATIONS = 50;
   var KO_BONUS = 25;
+  var MAXIMUM_PARTS = 50;
   var DRAW_ITERATIONS = 500;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
@@ -83,7 +88,7 @@ deathmatch.contest = (function() {
   }
 
   function nextGeneration( population ) {
-    var bySpecies = {}, next = [];
+    var bySpecies = {}, next = [], index=0;
     for ( var i=0,organism; organism=population[i]; i++)
       (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
 
@@ -91,8 +96,11 @@ deathmatch.contest = (function() {
       var species = bySpecies[id], speciesNext = [], harem = Math.ceil(species.length / 2);
       species.sort( compareOpponents );
       for ( var i=0,a; (a = species[i]) && speciesNext.length < species.length; i++ ) {
-        for (var j=1,b; (b = species[j]) && j <= harem && speciesNext.length < species.length; j++ )
-          speciesNext.push( deathmatch.creature.breedOrganisms(a,b) );
+        for (var j=1,b; (b = species[j]) && j <= harem && speciesNext.length < species.length; j++ ) {
+          var organism = deathmatch.creature.breedOrganisms(a,b);
+          organism.index = index++;
+          speciesNext.push( organism );
+        }
         harem = Math.ceil(harem/2);
       }
       next = next.concat(speciesNext);
@@ -182,6 +190,20 @@ deathmatch.contest = (function() {
 
     addContactListeners( match.world );
 
+    var leftParts = deathmatch.creature.parts(match.leftCreature);
+    var rightParts = deathmatch.creature.parts(match.rightCreature);
+    if ( leftParts > MAXIMUM_PARTS ) {
+      if ( rightParts > MAXIMUM_PARTS ) {
+        match.result = 'DOUBLE PARTS DQ';
+      } else {
+        match.rightCreature.wins++;
+        match.result = 'RIGHT BY PARTS DQ';
+      }
+    } else if ( rightParts > MAXIMUM_PARTS ) {
+      match.leftCreature.wins++;
+      match.result = 'LEFT BY PARTS DQ';      
+    }
+
     return match;
   }
 
@@ -243,6 +265,22 @@ deathmatch.contest = (function() {
       return updateScores(match);
     }
     return true;    
+  }
+
+  function matchSummary(match) {
+    return {
+      floorSlope: match.floorSlope,
+      result: match.result,
+      iterations: match.iterations,
+      left: { 
+        index: match.leftOrganism.index,
+        health: match.leftStats.health
+      },
+      right: {
+        index: match.rightOrganism.index,
+        health: match.rightStats.health
+      }
+    }
   }
 
   function updateScores(match) {
@@ -526,12 +564,13 @@ deathmatch.contest = (function() {
     PIXELS_PER_METER : PIXELS_PER_METER,
     cageParameters : cageParameters,
     startMatch : startMatch,
-    updateCreature: updateCreature,
+    updateCreature : updateCreature,
     updateMatch : updateMatch,
     addPhysics : addPhysics,
     nextGeneration : nextGeneration,
-    compareOpponents: compareOpponents,
-    pairOpponents: pairOpponents
+    compareOpponents : compareOpponents,
+    matchSummary : matchSummary,
+    pairOpponents : pairOpponents
   }
 })();
 
