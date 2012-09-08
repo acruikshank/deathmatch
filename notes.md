@@ -39,15 +39,22 @@ September 4, 2012
 -----------------
 Have breakpoint in place to catch box2d infinite loop error. Unfortunately, the breakpoint slows down the simulation to the point that it could take days to reproduce the error (I'm on the 3rd day now). I have basic localStorage based checkpointing in place now, so longer simulations should be possible. We're also storing enough information about matches that detailed data analysis should be possible. Haven't run enough simulations to discover anything of interest.
 
+September 8, 2012
+-----------------
+I've implemented a new breeding algorithm that allocates half the slots in the next generation based on wins in the smaller wins of the tournament and the rests allocated equally amongst the species. It's implemented in such a way that the balance of prize vs. distributed slots can be adjusted by constants. I've also change the way slots allocated to an organism are filled. Before the top creature would breed with the 2nd, 3rd, 4th. etc. creatures and the 2nd ranked creature would breed with the 3rd, 4th. etc. on down. Now the organism's mate is randomly selected from the species. This seemed more natural with the addition of slots allocated by wins, but I'm not sure how it'll play out in the simulation.
+
+I dropped mutation rate way down (from .1 to .02) to see what affect more genetic stability would have on the simulation on the long term. After ~500 generations I'm seeing mostly competive creatures, though none seem especially dangerous. This might be an adaptation to risk avoidance and it might be constrained variability due to the low mutation rate. Will have to check again later to see if the population seems more stable. Really need some analysis tools to understand the effecs of these changes.
+
+The simulation now supports storage in a Riak database. It turns out you only get 5M of local storage and that's only enough to store about 50 generations of data. Riak should make it fairly easy to run the types of analysis queries we're looking to run.
+
 TODO:
 
 1. Discover and fix box2Dweb infinite loop.
 2. Disqualify creatures whose initial geometry would put them in the wall or on the other creature's side.
-3. Modify breeding algorithm to award half reproductive slots based on placement and divide the rest evenly amongst species.
-4. Info on current opponents.
-5. Start, stop, name simulation, export, acceleration.
-6. Species analysis tools.
-7. Tools to analyze competitiveness between species
-8. KO bonus based on match length (shorter match = bigger bonus).
-9. Create a simulation object that specifies paramters like generation size and mutation rate.
-10. Web workers.
+3. Info on current opponents.
+4. Start, stop, name simulation, export, acceleration.
+5. Species analysis tools.
+6. Tools to analyze competitiveness between species
+7. KO bonus based on match length (shorter match = bigger bonus).
+8. Create a simulation object that specifies paramters like generation size and mutation rate.
+9. Web workers.
