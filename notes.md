@@ -35,14 +35,19 @@ Another interesting form was a kind of tank with a hexagon (septagon?) at it's c
 
 If the breeding algorithm is correct, you get these breeding combinatoins: 1:2, 1:3, 1:4, 1:5, 2:3, 2:4, 3:4, 4:5. Note that, if the 2nd and 3rd have an identical genome. If the the first has a new adaptation, we expect it to show up in a quarter of the next population. This seems reasonable, but it still might be worth looking into. It might be better to weight reproductive success on wins rather than rankings.
 
+September 4, 2012
+-----------------
+Have breakpoint in place to catch box2d infinite loop error. Unfortunately, the breakpoint slows down the simulation to the point that it could take days to reproduce the error (I'm on the 3rd day now). I have basic localStorage based checkpointing in place now, so longer simulations should be possible. We're also storing enough information about matches that detailed data analysis should be possible. Haven't run enough simulations to discover anything of interest.
+
 TODO:
 
-1. Some way of persisting simulation.
-2. Fix match pairing algorithm.
-3. Discover and fix box2Dweb infinite loop.
-4. Disqualify creatures with too many parts or that exceed certain bounds.
-5. Look into weighting breeding algorithm by wins.
-6. Info on current opponents.
-7. Species analysis tools.
-8. Tools to analyze competitiveness between species
-9. KO bonus based on match length (shorter match = bigger bonus).
+1. Discover and fix box2Dweb infinite loop.
+2. Disqualify creatures whose initial geometry would put them in the wall or on the other creature's side.
+3. Modify breeding algorithm to award half reproductive slots based on placement and divide the rest evenly amongst species.
+4. Info on current opponents.
+5. Start, stop, name simulation, export, acceleration.
+6. Species analysis tools.
+7. Tools to analyze competitiveness between species
+8. KO bonus based on match length (shorter match = bigger bonus).
+9. Create a simulation object that specifies paramters like generation size and mutation rate.
+10. Web workers.

@@ -248,8 +248,8 @@ deathmatch.creature = (function() {
     return genome;
   }
 
-  var EDGE_SLOPE = 5,
-      GENERAL_MUTATION_RATE = .1;
+  var EDGE_SLOPE = 20,
+      GENERAL_MUTATION_RATE = .02;
       TRAIT_SNP = .4 * GENERAL_MUTATION_RATE,
       CHILD_SNP = .75 * GENERAL_MUTATION_RATE,
       TRAIT_SHIFT = .02 * GENERAL_MUTATION_RATE,
@@ -334,11 +334,11 @@ deathmatch.creature = (function() {
 
       // copy donor traits, averaging the ends out the ends
       if (start+donorShift >= 0)
-        cloner[TRAITS[start]] = randBetween( cloner[TRAITS[start]], donor[TRAITS[start+donorShift]], EDGE_SLOPE );
+        cloner[TRAITS[start]] = coinFlip() ? cloner[TRAITS[start]] : donor[TRAITS[start+donorShift]];
       for ( var j=start+1; j<end; j++ )
         cloner[TRAITS[j]] = donor[TRAITS[donorShift+j]];
       if (end+donorShift < TRAITS.length)
-        cloner[TRAITS[end]] = randBetween( cloner[TRAITS[end]], donor[TRAITS[end+donorShift]], EDGE_SLOPE );
+        cloner[TRAITS[end]] = coinFlip() ? cloner[TRAITS[end]] : donor[TRAITS[end+donorShift]];
 
       // child indices
       ti1 = randIndex(donor.chd); ti2 = randIndex(donor.chd);

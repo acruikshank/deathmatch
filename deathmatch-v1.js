@@ -28,6 +28,8 @@ deathmatch.contest = (function() {
     CAGE_BOTTOM : CAGE_BOTTOM
   };
 
+  var ROUND_PRIZES = { 1:8, 2:4, 4:2, 8:1 };
+
   var fixture_index = 10;
 
   var b2Vec2 = Box2D.Common.Math.b2Vec2
@@ -87,6 +89,101 @@ deathmatch.contest = (function() {
     return sum;
   }
 
+  /*
+    The breeding algorithm needs to strike a balance between inter and intra species competition.
+    If species are allocated an equal number of slots, an individual of a poorly performing species
+    need only score slightly higher than the rest of its species to ensure reproductive success.
+    If tournament success is the only determinant of reproductive success, poor performing species
+    will go extinct more often than this simulation can afford. This algorithm mixes the two.
+    For each match, if match has winner, breed it X times each with a different randomly chosen member
+    of the same species. X is the prize set per round.
+    Allocate (remaining slots / number of species) slots to each species so that exactly remiaining
+    slots are taken, but the slots allocated to any two species differs by no more than 1.
+    For each species, take the highest scoring organism and breed it ceil(species slots/2) times
+    with diferent randomly selected members of the same species, repeat the procedure with the second
+    highest scoring organism and so on until the slots are filled.
+    The number of members of a species going into the next generation cannot exceed half the population
+    size. The first section can just cut the prizes when the species is about to go over the limit. The
+    second algorithm is more complicated. Entering the second stage, so long as the remaining slots 
+    are > the number of species, there can be at most one species that would exceed the half population
+    limit by receiving an equal share of remaining slots. So to fix this problem, start by finding this
+    species (if it exists) giving it exactly as many slots as it can have, then removing it from the
+    pool. From there the equal distribution algorithm shouldn't cause a problem.
+   */
+  function randIndex(ar) { return (Math.random() * ar.length)|0; }
+  function randItem(ar) { return ar[randIndex(ar)]; }
+  function mapInc(m,k) { m[k] = (m[k]||0) + 1; }
+  function mapAdd(m,k,n) { m[k] = (m[k]||0) + n; }
+  function breedRandomly( organism, species ) {
+    var mate = randItem( species );
+    while ( mate === organism )
+      mate = randItem( species );
+    return deathmatch.creature.breedOrganisms( organism, mate );
+  }
+  function nextSpeciesGeneration( species, slots ) {
+    var speciesNext = [], harem = Math.ceil(slots / 2);
+    species.sort( compareOpponents );
+    for ( var i=0,a; (a = species[i]) && speciesNext.length < slots; i++ ) {
+      for (var j=1; j <= harem && speciesNext.length < slots; j++ ) {
+        var organism = breedRandomly(a,species);
+        speciesNext.push( organism );
+      }
+      harem = Math.ceil(harem/2);
+    } 
+    return speciesNext;
+  }
+  function nextGeneration( matchSummary ) {
+    var bySpecies = {}, speciesCount={}, next=[], winner, speciesLimit = matchSummary.population.length/2;
+    for ( var i=0,organism; organism=matchSummary.population[i]; i++)
+      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
+
+    // award slots for winning matches
+    for (var i=matchSummary.rounds.length-1,round; round = matchSummary.rounds[i]; i--) {
+      var prize = ROUND_PRIZES[round.length];
+      if ( prize ) for (var j=0,match; match = round[j]; j++) {
+        winner = ( match.left.winner && matchSummary.population[match.left.index] )
+                 || ( match.right.winner && matchSummary.population[match.right.index] );
+        if (winner) for (var k=0; k<prize && (speciesCount[winner.species.id]||0) < speciesLimit; k++) {
+          next.push( breedRandomly( winner, bySpecies[winner.species.id] ) );
+          mapInc( speciesCount, winner.species.id );
+        }
+      }
+    }
+
+    // find species with most slots and number of species
+    var numberOfSpecies=0, biggestSpecies, remainingSlots = matchSummary.population.length - next.length;
+    for ( var id in bySpecies ) {
+      numberOfSpecies++;
+      if ( speciesCount[id] && ( ! biggestSpecies || speciesCount[biggestSpecies] < speciesCount[id] ) )
+        biggestSpecies = id;
+    }
+
+    // avoid adding too many slots for biggest species and remove it from the next calculation
+    if ( biggestSpecies && speciesCount[biggestSpecies] ) {
+      var slots = Math.min(speciesLimit - speciesCount[biggestSpecies], Math.ceil(remainingSlots/numberOfSpecies) );
+      next = next.concat( nextSpeciesGeneration(bySpecies[biggestSpecies], slots) )
+      numberOfSpecies--;
+      remainingSlots -= slots;
+      mapAdd(speciesCount, biggestSpecies, slots);
+      delete bySpecies[biggestSpecies];
+    }
+
+    // allocate slots roughly evenly to the rest of species.
+    for ( var id in bySpecies ) {
+      slots = Math.ceil(remainingSlots / numberOfSpecies);
+      next = next.concat( nextSpeciesGeneration(bySpecies[id], slots) )
+      numberOfSpecies--;
+      remainingSlots -= slots;
+      mapAdd( speciesCount, id, slots);
+    }
+
+    // assign an index to each organism
+    for (var i=0; i < next.length; i++) next[i].index = i;
+
+    return next;
+  }
+
+  /*
   function nextGeneration( population ) {
     var bySpecies = {}, next = [], index=0;
     for ( var i=0,organism; organism=population[i]; i++)
@@ -107,6 +204,7 @@ deathmatch.contest = (function() {
     }
     return next;
   }
+  */
 
   /*
     pairOpponents( population, matchCount ) - create a list of pairs for competition
@@ -119,31 +217,42 @@ deathmatch.contest = (function() {
     -   We keep a count for each species parent encountered. 
     -   If the count is = matchCount any organisms with that species parent will be skipped.
     - The first pair is created from the first organism in opponent list and the last compatible organism.
-    -   These are removed from the oppenent list.
+    -   These are removed from the opponent list.
     -   This process is repeated until all the organisms are matched.
    */
+  function parentSpeciesId( organism ) { return (organism.species.parent || organism.species).id }
+  function siblingSpecies( org1, org2 ) {  return parentSpeciesId(org1) == parentSpeciesId(org2); }
+  function lastCompatibleIndex( org, participants ) {
+    for (var i=participants.length-1, organism; organism=participants[i]; i--)
+      if ( ! siblingSpecies(org,organism) ) return i;
+    return -1;
+  }
   function pairOpponents( population, matchCount ) {
-    var speciesParent, speciesCount = {}, participants = [], pairs = [];
+    var speciesCount = {}, participants = [], pairs = [];
     for (var i=0,organism; participants.length < 2*matchCount && (organism=population[i]); i++) {
-      speciesParent = organism.species.parent || organism.species;
-      if ( (speciesCount[speciesParent.id]||0) + 1 <= matchCount ) {
+      if ( (speciesCount[parentSpeciesId(organism)]||0) + 1 <= matchCount ) {
         participants.push(organism);
-        speciesCount[speciesParent.id] = (speciesCount[speciesParent.id]||0) + 1;
+        speciesCount[parentSpeciesId(organism)] = (speciesCount[parentSpeciesId(organism)]||0) + 1;
       }
     }
 
-    while ( participants.length > 1 ) {
-      var pair = participants.splice(0,1), 
-          firstSpeciesParent = (pair[0].species.parent || pair[0].species).id;
-      for (var i=participants.length-1, organism; organism=participants[i]; i--) {
-        secondSpeciesParent = (organism.species.parent || organism.species).id;
-        if ( firstSpeciesParent != secondSpeciesParent ) {
-          pair.push( participants.splice(i,1)[0] );
-          break;
+    while ( participants.length > 0 ) {
+      var pair = participants.splice(0,1), other = lastCompatibleIndex(pair[0],participants);
+
+      if ( ~other ) {
+        pair.push( participants.splice(other,1)[0] );
+      } else {
+        // The last two are of sibling species. There must be at least one other
+        // match where neither of the participants are related to this one.
+        for ( var i=pairs.length-1, otherPair; otherPair = pairs[i]; i-- ) {
+          if ( ! siblingSpecies(pair[0],otherPair[0]) && ! siblingSpecies(pair[0],otherPair[1]) ) {
+            pair = otherPair.splice(1,1,pair[0]);
+            pair.push( participants.splice(0,1)[0] );
+            break;
+          }
         }
       }
-      if ( pair.length > 1 )
-        pairs.push(pair);
+      pairs.push(pair);
     }
 
     return pairs;
@@ -222,47 +331,33 @@ deathmatch.contest = (function() {
   }
 
   function assessMatch( match ) {
-    if ( match.rightStats.health <= 0.0 ) {
-      match.result = "LEFT KO";
-      match.leftOrganism.wins++;
-      match.leftOrganism.score += score(match.leftStats,match.rightStats, true);
-      return false;
-    }
-    if ( match.leftStats.health <= 0.0 ) {
-      match.result = "RIGHT KO";
-      match.rightOrganism.wins++;
-      match.leftOrganism.score += score(match.rightStats,match.leftStats, true);
-      return false;
-    }
+    if ( match.rightStats.health <= 0.0 )
+      return updateMatchStats(match, "LEFT KO", true, false );
 
-    if ( match.rightStats.immobileIterations >= TKO_ITERATIONS ) {
-      match.result = "LEFT TKO";
-      match.leftOrganism.wins++;
-      return updateScores(match);
-    }
-    if ( match.leftStats.immobileIterations >= TKO_ITERATIONS ) {
-      match.result = "RIGHT TKO";
-      match.rightOrganism.wins++;
-      return updateScores(match);
-    }
+    if ( match.leftStats.health <= 0.0 )
+      return updateMatchStats(match, "RIGHT KO", false, true );
+
+    if ( match.rightStats.immobileIterations >= TKO_ITERATIONS )
+      return updateMatchStats(match, "LEFT TKO", true, false );
+
+    if ( match.leftStats.immobileIterations >= TKO_ITERATIONS )
+      return updateMatchStats(match, "RIGHT TKO", false, true );
+
     if ( match.leftStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS 
-      && match.rightStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS ) {
-      match.result = "BOTH IMMOBILE";
-      return updateScores(match); 
-    }
+       && match.rightStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS )
+      return updateMatchStats(match, "BOTH IMMOBILE", false, false );
+
     if ( match.iterations >= DRAW_ITERATIONS ) {
       var leftScore = score(match.leftStats,match.rightStats, false);
       var rightScore = score(match.rightStats,match.leftStats, false);
-      if ( rightScore - leftScore > .00001 ) {
-        match.result = "RIGHT ON POINTS";
-        match.rightOrganism.wins++;
-      } else if ( leftScore - rightScore > .00001 ) {
-        match.result = "LEFT ON POINTS";
-        match.leftOrganism.wins++;
-      } else {
-        match.result = "DRAW";
-      }
-      return updateScores(match);
+
+      if ( leftScore - rightScore > .00001 )
+        return updateMatchStats(match, "LEFT ON POINTS", true, false );
+
+      if ( rightScore - leftScore > .00001 )
+        return updateMatchStats(match, "RIGHT ON POINTS", false, true );
+
+      return updateMatchStats(match, "DRAW", false, false );
     }
     return true;    
   }
@@ -274,13 +369,28 @@ deathmatch.contest = (function() {
       iterations: match.iterations,
       left: { 
         index: match.leftOrganism.index,
+        winner: match.leftStats.winner,
         health: match.leftStats.health
       },
       right: {
         index: match.rightOrganism.index,
+        winner: match.rightStats.winner,
         health: match.rightStats.health
       }
     }
+  }
+
+  function updateMatchStats( match, status, leftWinner, rightWinner ) {
+    match.result = status;
+    if (leftWinner) {
+      match.leftOrganism.wins++;
+      match.leftStats.winner = true;
+    }
+    if (rightWinner) {
+      match.rightOrganism.wins++;
+      match.rightStats.winner = true;      
+    }
+    return updateScores(match);
   }
 
   function updateScores(match) {

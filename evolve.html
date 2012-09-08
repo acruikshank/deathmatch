@@ -7,6 +7,46 @@
   <title>Evolve</title>
   <style type="text/css">
       body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%; margin:0; }
+
+      #simulation { display: none; }
+      #startup .name {
+        width: 420px;
+        margin: 100px auto 20px;
+        font-family: Helvetica,Arial,serif;
+        font-size: 18px;
+        color: white;
+        font-weight: bold;
+        text-shadow: 0 0 4px #666;
+      }
+      #simulation_name {
+        border: none;
+        padding: 4px 6px;
+        width: 180px;
+        border-radius: 3px;
+        font-family: Helvetica,Arial,sans-serif;
+        color: #666;
+        vertical-align: middle;
+        box-shadow: 0 0 4px #999;
+      }
+      #continue {
+        -webkit-appearance: none;
+        border: none;
+        border-radius: 4px;
+        padding: 3px 8px;
+        background: white;
+        box-shadow: 1px 1px 2px #999;
+        font-family: Helvetica,Arial,sans-serif;
+        font-size: 13px;
+        color: #777;
+        cursor: pointer;
+      }
+      #continue:hover {
+        box-shadow: 1px 1px 2px #000;
+      }
+      #continue:active {
+        box-shadow: 0 0 2px #000;
+      }
+
       #header                 { padding-left: 30px; }
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
@@ -62,7 +102,7 @@
       .round6 canvas { width:100px; }
 
   </style>
-  <script type="text/javascript" src="Box2DWeb-2.1.a.3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
@@ -87,9 +127,93 @@
     return out;
   }
 
+  /* url (string*), body (string), handler (string->), errorHandler (number->), headers ({:string}) */
+  function request( options ) {
+    var xhr =  window.ActiveXObject ? new ActiveXObject("Microsoft.XMLHTTP") : new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+      if ( xhr.readyState < 4 ) return;
+      if ((!xhr.status && (location.protocol == "file:")) || (xhr.status >= 200 && xhr.status < 300) 
+          || xhr.status == 304 || xhr.status == 1223) {
+        if (options.handler) options.handler(xhr.responseText);
+      } else if (options.errorHandler) options.errorHandler(xhr.status)
+    };
+    xhr.open(options.method || 'GET', options.url, true );
+    if (options.headers) for (var k in options.headers) xhr.setRequestHeader(k, options.headers[k]);
+    if (("POST" === options.method) && (( ! options.headers ) || ( ! options.headers['Content-Type'] )))
+      xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+    xhr.send( options.body || null );
+  }
+
+  function parseCFG( parser, text ) {
+    var state = parser.rules[parser.initial_state], lines = text.split(/\r?\n/), ctx={};
+    if ( parser.initialize ) parser.initialize(ctx);
+    for (var i=0,line; line=lines[i], i<lines.length; i++)
+      if (match = line.match(state[0]))
+        for (var j=0; j<match.length; j++)
+          if (match[j] != null && state[1][j]) {
+            state = parser.rules[ state[1][j](match, ctx) ]
+            break;
+          }
+    return ctx;
+  }
+
+  var multipartJSONParser = {
+    initial_state: 'PREAMBLE',
+    initialize: function(ctx) { ctx.content = []; },
+    rules: {
+      PREAMBLE : [ /^--(.*[^-].|.*[^-])$/, {
+        1:function(m, ctx) { ctx.boundary = m[1]; return 'HEADERS'; }}],
+      HEADERS : [ /(^$)|^Content-type:\s*(.*?)(;.*)?$/i, {
+        1:function(m, ctx) { ctx.chunk = []; return 'CONTENT'; },
+        2:function(m, ctx) { 
+          if (m[2] == 'multipart/mixed') return 'PREAMBLE';
+          ctx.skip = (m[2] != 'application/json'); return 'HEADERS'; }}],
+      CONTENT : [ /^--(.*?)--?$|^--(.*)$|^(.*)$/, {
+        1:function(m, ctx) {
+          if ( m[1] != ctx.boundary ) { ctx.chunk.push(m[0]); return 'CONTENT' }
+          if (!ctx.skip) ctx.content.push(JSON.parse(ctx.chunk.join('\n')));
+          return 'PREAMBLE'; },
+        2:function(m, ctx) {
+          if (!ctx.skip && ctx.chunk.length) 
+            ctx.content.push(JSON.parse(ctx.chunk.join('\n')));
+          ctx.boundary = m[2];
+          return 'HEADERS'; },
+        3:function(m, ctx) {ctx.chunk.push(m[0]); return 'CONTENT'; }}]
+    }
+  }
+
+  function multipart_json(body) {
+    return parseCFG( multipartJSONParser, body ).content;
+  }
+
+  function saveGeneration() {
+    var key = encodeURIComponent(simulation)+'-'+lpad(7,generationIndex);
+    request({
+      method:'PUT',
+      url:'/riak/generations/'+key,
+      headers: {
+        'Content-type':'application/json',
+        'x-riak-index-simulation_bin':simulation,
+        'x-riak-index-generation_bin':generationIndex+''
+      },
+      body: JSON.stringify(generation)
+    });
+    request({
+      method:'PUT',
+      url:'/riak/checkpoints/'+encodeURIComponent(simulation),
+      headers: {
+        'Content-type':'application/json',
+        Link: '</riak/generations/'+key+'>; riaktag="latest"'
+      },
+      body: JSON.stringify({index:generationIndex})
+    })
+  }
+
   function shuffle(ar) {
     for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
   }
+
+  function lpad(n,d) { return String(Math.pow(10,n) + d).substring(1); }
 
   function initializeTournament() {
     population = [];
@@ -116,14 +240,16 @@
 
     roundIndex = 1;
     matchIndex = 0;
-    el('generation').innerHTML = 'Generation ' + generationIndex;
+    var header = 'generation ' + generationIndex;
+    if (simulation) header = simulation + ' - ' + header;
+    el('generation').innerHTML = header;
     el('rounds').innerHTML = '';
     renderRound( roundIndex, pairs );
     nextMatch();
   }
 
   function nextGeneration() {
-    population = deathmatch.contest.nextGeneration(population);
+    population = deathmatch.contest.nextGeneration(generation);
     generationIndex++;
     startTournament();
   }
@@ -132,11 +258,9 @@
     round = [];
 
     if ( roundSize < 2 ) {
-      simulation.lastGeneration = generationIndex;
-      if ( window.localStorage ) {
-        localStorage.simulation = JSON.stringify(simulation);
-        localStorage['generation-'+generationIndex] = JSON.stringify(generation);
-      }
+      if ( simulation && simulation.length )
+        saveGeneration()
+
       return nextGeneration();
     }
 
@@ -272,7 +396,26 @@
     matchTimeout = setTimeout( nextMatch, accelerated ? 1 : 1000 );
   }
 
-  function init() {
+  function startSimulation() {
+    el('startup').style.display = 'none';
+    el('simulation').style.display = 'block';
+
+    simulation = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
+
+    if ( simulation ) {
+      request({url:'/riak/checkpoints/'+encodeURIComponent(simulation)+'/_,latest,_/', 
+        handler: function(o) { 
+          generationIndex = o.match(/^x-riak-index-generation_bin: (\d+)/m)[1]|0;
+          generation = multipart_json(o)[0];
+          population = generation.population;
+          nextGeneration();
+        }, 
+        errorHandler:function(o) { 
+          initializeTournament();
+        } });
+    } else {
+      initializeTournament();
+    }
 
     document.onkeypress = function(e) { 
       if (e.keyCode == 32) {
@@ -285,25 +428,30 @@
         return false;
       }
     }
+  }
 
-    if ( window.localStorage && localStorage.simulation ) {
-      simulation = JSON.parse(localStorage.simulation);
-      population = JSON.parse(localStorage['generation-' + simulation.lastGeneration]).population;
-      generationIndex = simulation.lastGeneration;
-      nextGeneration();
-    } else {
-      simulation = {firstGeneration:1, lastGeneration:1}
-      initializeTournament();
+  function init() {
+    el('continue').onclick = startSimulation;
+    el('simulation_name').onkeyup = function() {
+      el('continue').innerHTML = el('simulation_name').value.match(/\S/) ? 'begin' : 'skip';
     }
+    el('simulation_name').focus();
   }
 
   </script>
 </head>
 <body onload="init()">
-<div>
-  <h1 id="generation"></h1>
-  <canvas id="display" width="800" height="500"></canvas>
-  <div id="rounds"></div>
-</div>
+  <div id="startup">
+    <div class="name">
+      <label>simulation name:</label>
+      <input type="text" id="simulation_name"/>
+      <button id="continue">skip</button>
+    </div>
+  </div>
+  <div id="simulation">
+    <h1 id="generation"></h1>
+    <canvas id="display" width="800" height="500"></canvas>
+    <div id="rounds"></div>
+  </div>
 </body>
 </html>
