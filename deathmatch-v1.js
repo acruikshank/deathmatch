@@ -11,6 +11,7 @@ deathmatch.contest = (function() {
   var MINIMUM_MOTION = .02;
   var TKO_ITERATIONS = 100;
   var BOTH_IMMOBILE_ITERATIONS = 50;
+  var WIN_BONUS = 200;
   var KO_BONUS = 25;
   var MAXIMUM_PARTS = 50;
   var DRAW_ITERATIONS = 500;
@@ -58,6 +59,8 @@ deathmatch.contest = (function() {
 
   var CAGE_BODY_DEF = new b2BodyDef;
   CAGE_BODY_DEF.angularDamping = 4;
+
+  var MIN_ORGANISM_BREED_WEIGHT = 50;
 
   var sideCageIntercept, centerCageIntercept;
 
@@ -114,44 +117,69 @@ deathmatch.contest = (function() {
   function randItem(ar) { return ar[randIndex(ar)]; }
   function mapInc(m,k) { m[k] = (m[k]||0) + 1; }
   function mapAdd(m,k,n) { m[k] = (m[k]||0) + n; }
-  function breedRandomly( organism, species ) {
-    var mate = randItem( species );
+  function Chooser( objects ) {
+    var choices=[], weights=[0], totalWeight=0, chooser={};
+    var add = chooser.add = function( obj, weight ) {
+      choices.push(obj);
+      weights.push( totalWeight += weight );
+      return chooser;
+    }
+    chooser.choose = function() {
+      if ( choices.length == 0 ) return null;
+      var choice = Math.random() * totalWeight, start=0, end=weights.length-1, next;
+      while ( end > start + 1 ) {
+        next=start+Math.floor((end - start)/2);
+        choice >= weights[next] ? start = next : end = next;
+      }
+      return choices[start];
+    }
+    if ( objects ) for (var key in objects) add( key, objects[key] );
+    return chooser;
+  }
+  function breedRandomly( organism, speciesChooser ) {
+    var mate = speciesChooser.choose();
     while ( mate === organism )
-      mate = randItem( species );
+      mate = speciesChooser.choose();
     return deathmatch.creature.breedOrganisms( organism, mate );
   }
-  function nextSpeciesGeneration( species, slots ) {
+  function nextSpeciesGeneration( species, slots, speciesChooser ) {
     var speciesNext = [], harem = Math.ceil(slots / 2);
     species.sort( compareOpponents );
+
     for ( var i=0,a; (a = species[i]) && speciesNext.length < slots; i++ ) {
       for (var j=1; j <= harem && speciesNext.length < slots; j++ ) {
-        var organism = breedRandomly(a,species);
-        speciesNext.push( organism );
+        speciesNext.push( breedRandomly(a,speciesChooser) );
       }
       harem = Math.ceil(harem/2);
     } 
     return speciesNext;
   }
-  function nextGeneration( matchSummary ) {
-    var bySpecies = {}, speciesCount={}, next=[], winner, speciesLimit = matchSummary.population.length/2;
-    for ( var i=0,organism; organism=matchSummary.population[i]; i++)
-      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
+  function nextGeneration( generationSummary ) {
+    var bySpecies = {}, byIndex=[], speciesCount={}, next=[], winner, speciesLimit = generationSummary.population.length/2;
+    var speciesChoosers = {};
+    for ( var i=0,organism; organism=generationSummary.population[i]; i++) {
+      var id = organism.species.id;
+      (bySpecies[id] = bySpecies[id] || []).push(organism);
+      speciesChoosers[id] = speciesChoosers[id] || Chooser();
+      speciesChoosers[id].add( organism, Math.max(organism.score, MIN_ORGANISM_BREED_WEIGHT) );
+      byIndex[organism.index] = organism;
+    }
 
     // award slots for winning matches
-    for (var i=matchSummary.rounds.length-1,round; round = matchSummary.rounds[i]; i--) {
+    for (var i=generationSummary.rounds.length-1,round; round = generationSummary.rounds[i]; i--) {
       var prize = ROUND_PRIZES[round.length];
       if ( prize ) for (var j=0,match; match = round[j]; j++) {
-        winner = ( match.left.winner && matchSummary.population[match.left.index] )
-                 || ( match.right.winner && matchSummary.population[match.right.index] );
+        winner = ( match.left.winner && byIndex[match.left.index] )
+                 || ( match.right.winner && byIndex[match.right.index] );
         if (winner) for (var k=0; k<prize && (speciesCount[winner.species.id]||0) < speciesLimit; k++) {
-          next.push( breedRandomly( winner, bySpecies[winner.species.id] ) );
+          next.push( breedRandomly( winner, speciesChoosers[winner.species.id] ) );
           mapInc( speciesCount, winner.species.id );
         }
       }
     }
 
     // find species with most slots and number of species
-    var numberOfSpecies=0, biggestSpecies, remainingSlots = matchSummary.population.length - next.length;
+    var numberOfSpecies=0, biggestSpecies, remainingSlots = generationSummary.population.length - next.length;
     for ( var id in bySpecies ) {
       numberOfSpecies++;
       if ( speciesCount[id] && ( ! biggestSpecies || speciesCount[biggestSpecies] < speciesCount[id] ) )
@@ -161,7 +189,7 @@ deathmatch.contest = (function() {
     // avoid adding too many slots for biggest species and remove it from the next calculation
     if ( biggestSpecies && speciesCount[biggestSpecies] ) {
       var slots = Math.min(speciesLimit - speciesCount[biggestSpecies], Math.ceil(remainingSlots/numberOfSpecies) );
-      next = next.concat( nextSpeciesGeneration(bySpecies[biggestSpecies], slots) )
+      next = next.concat( nextSpeciesGeneration(bySpecies[biggestSpecies], slots, speciesChoosers[biggestSpecies]) )
       numberOfSpecies--;
       remainingSlots -= slots;
       mapAdd(speciesCount, biggestSpecies, slots);
@@ -171,40 +199,18 @@ deathmatch.contest = (function() {
     // allocate slots roughly evenly to the rest of species.
     for ( var id in bySpecies ) {
       slots = Math.ceil(remainingSlots / numberOfSpecies);
-      next = next.concat( nextSpeciesGeneration(bySpecies[id], slots) )
+      next = next.concat( nextSpeciesGeneration(bySpecies[id], slots, speciesChoosers[id]) )
       numberOfSpecies--;
       remainingSlots -= slots;
       mapAdd( speciesCount, id, slots);
     }
+    console.log( speciesCount );
 
     // assign an index to each organism
     for (var i=0; i < next.length; i++) next[i].index = i;
 
     return next;
   }
-
-  /*
-  function nextGeneration( population ) {
-    var bySpecies = {}, next = [], index=0;
-    for ( var i=0,organism; organism=population[i]; i++)
-      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
-
-    for ( var id in bySpecies ) {
-      var species = bySpecies[id], speciesNext = [], harem = Math.ceil(species.length / 2);
-      species.sort( compareOpponents );
-      for ( var i=0,a; (a = species[i]) && speciesNext.length < species.length; i++ ) {
-        for (var j=1,b; (b = species[j]) && j <= harem && speciesNext.length < species.length; j++ ) {
-          var organism = deathmatch.creature.breedOrganisms(a,b);
-          organism.index = index++;
-          speciesNext.push( organism );
-        }
-        harem = Math.ceil(harem/2);
-      }
-      next = next.concat(speciesNext);
-    }
-    return next;
-  }
-  */
 
   /*
     pairOpponents( population, matchCount ) - create a list of pairs for competition
@@ -262,8 +268,6 @@ deathmatch.contest = (function() {
    used as a sorting function to rank organsims after a round of matches
    */
   function compareOpponents( opponent1, opponent2 ) {
-    if ( opponent1.wins != opponent2.wins )
-      return opponent2.wins - opponent1.wins;
     return opponent2.score - opponent1.score;
   }
 
@@ -384,10 +388,12 @@ deathmatch.contest = (function() {
     match.result = status;
     if (leftWinner) {
       match.leftOrganism.wins++;
+      match.leftOrganism.score += WIN_BONUS;
       match.leftStats.winner = true;
     }
     if (rightWinner) {
       match.rightOrganism.wins++;
+      match.rightOrganism.score += WIN_BONUS;
       match.rightStats.winner = true;      
     }
     return updateScores(match);
@@ -400,7 +406,7 @@ deathmatch.contest = (function() {
   }
 
   function score(organismStats, opponentStats, ko) {
-    var score = Math.max(organismStats.health - opponentStats.health, 0);
+    var score = Math.max(100 - opponentStats.health, 0);
     if (ko) score += KO_BONUS;
     return score;
   }
@@ -542,8 +548,7 @@ deathmatch.contest = (function() {
     }
     if ( stats ) {
       stats.health = assessDamage( creature, match );
-      if ( Math.abs( creature.origin.x - stats.lastPosition.x ) > MINIMUM_MOTION ||
-           Math.abs( creature.origin.y - stats.lastPosition.y ) > MINIMUM_MOTION ) {
+      if ( Math.abs( creature.origin.x - stats.lastPosition.x ) > MINIMUM_MOTION ) {
         stats.immobileIterations = 0;
         stats.lastPosition = {x:creature.origin.x, y:creature.origin.y};
       } else {

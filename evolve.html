@@ -109,7 +109,7 @@
   <script language="javascript">
 
   var POPULATION_SIZE = 64;
-  var SPECIES_SIZE = 8;
+  var SPECIES_SIZE = 16;
   var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex, generationIndex = 1;
   var matchTimeout, simulation, generation, round;
   var accelerated = false;
@@ -194,7 +194,7 @@
       headers: {
         'Content-type':'application/json',
         'x-riak-index-simulation_bin':simulation,
-        'x-riak-index-generation_bin':generationIndex+''
+        'x-riak-index-generation_int':generationIndex+''
       },
       body: JSON.stringify(generation)
     });

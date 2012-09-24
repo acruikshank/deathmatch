@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Population Test</title>
+  <style type="text/css">
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%; margin:0; }
+
+
+  </style>
+  <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script language="javascript">
+
+  var POPULATION_SIZE = 64;
+  var SPECIES_SIZE = 8;
+
+  var population, stats = {};
+
+  function el(id) { return document.getElementById(id); }
+  function gen( name, clss, atts ) {
+    var el = document.createElement(name), out={};
+    if ( typeof clss == 'object' ) atts=clss, clss=null;
+    for (var att in atts) el.setAttribute(att,atts[att]);
+    if ( clss ) el.setAttribute('class', clss);
+    out.add = function(node) { return el.appendChild( node.el ? node.el() : node ), out; };
+    out.text = function(txt) { return el.appendChild( document.createTextNode(txt) ), out };
+    out.el = function() { return el; };
+    return out;
+  }
+
+  function shuffle(ar) {
+    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
+  }
+  function randIndex(ar) { return (Math.random() * ar.length)|0; }
+  function randItem(ar) { return ar[randIndex(ar)]; }
+
+  function initializePopulation() {
+    population = [];
+    while ( population.length < POPULATION_SIZE )
+      population = population.concat( deathmatch.creature.newSpecies( Math.min(SPECIES_SIZE, POPULATION_SIZE-population.length) ) );
+    shuffle(population);
+  }
+
+  function breedRandomly( organism, species ) {
+    var mate = randItem( species );
+    while ( mate === organism )
+      mate = randItem( species );
+    return deathmatch.creature.breedOrganisms( organism, mate, stats );
+  }
+  function nextSpeciesGeneration( species, slots ) {
+    var speciesNext = [], harem = Math.ceil(slots / 2);
+    for ( var i=0,a; (a = species[i]) && speciesNext.length < slots; i++ ) {
+      for (var j=1; j <= harem && speciesNext.length < slots; j++ ) {
+        var organism = breedRandomly(a,species);
+        speciesNext.push( organism );
+      }
+      harem = Math.ceil(harem/2);
+    } 
+    return speciesNext;
+  }
+  function nextGeneration( ) {
+    var bySpecies = {}, next=[];
+    for ( var i=0,organism; organism=population[i]; i++)
+      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
+    for ( var speciesId in bySpecies )
+      next = next.concat(nextSpeciesGeneration(bySpecies[speciesId],bySpecies[speciesId].length));
+  }
+
+  function init() {
+    initializePopulation()
+    for ( var i=0; i < 2000; i++ ) {
+      nextGeneration();
+      for ( var j=0,organism; organism=population[j]; j++ ) {
+        for ( var k=0,chromosome; chromosome=organism.genome[k];k++) {
+          for ( var trait in chromosome ) {
+            if ( trait != 'chd' && isNaN(chromosome[trait]) ) {
+              console.log(organism);
+              throw new Error('invalid organism');
+            }
+          }
+        }
+      }
+    }
+    for ( var key in stats ) {
+      if ( !key.match(/^has_/) )
+        console.log( key, (stats[key] / stats['recombinations']).toFixed(4), (stats['has_'+key] / stats['recombinations']).toFixed(4), stats[key] );
+    }
+  }
+
+  </script>
+</head>
+<body onload="init()">
+</body>
+</html>
