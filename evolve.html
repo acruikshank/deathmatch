@@ -106,12 +106,15 @@
   <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="riak-store.js" charset="utf-8"></script>
   <script language="javascript">
 
-  var POPULATION_SIZE = 64;
-  var SPECIES_SIZE = 16;
-  var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex, generationIndex = 1;
-  var matchTimeout, simulation, generation, round;
+  var POPULATION_DEFAULTS = {
+    POPULATION_SIZE : 64,
+    SPECIES_SIZE : 16
+  }
+  var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex;
+  var matchTimeout, simulation, generation, round, simulationName;
   var accelerated = false;
   var state = 'PRE_TOURNAMENT';
 
@@ -126,99 +129,27 @@
     out.el = function() { return el; };
     return out;
   }
-
-  /* url (string*), body (string), handler (string->), errorHandler (number->), headers ({:string}) */
-  function request( options ) {
-    var xhr =  window.ActiveXObject ? new ActiveXObject("Microsoft.XMLHTTP") : new XMLHttpRequest();
-    xhr.onreadystatechange = function() {
-      if ( xhr.readyState < 4 ) return;
-      if ((!xhr.status && (location.protocol == "file:")) || (xhr.status >= 200 && xhr.status < 300) 
-          || xhr.status == 304 || xhr.status == 1223) {
-        if (options.handler) options.handler(xhr.responseText);
-      } else if (options.errorHandler) options.errorHandler(xhr.status)
-    };
-    xhr.open(options.method || 'GET', options.url, true );
-    if (options.headers) for (var k in options.headers) xhr.setRequestHeader(k, options.headers[k]);
-    if (("POST" === options.method) && (( ! options.headers ) || ( ! options.headers['Content-Type'] )))
-      xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
-    xhr.send( options.body || null );
-  }
-
-  function parseCFG( parser, text ) {
-    var state = parser.rules[parser.initial_state], lines = text.split(/\r?\n/), ctx={};
-    if ( parser.initialize ) parser.initialize(ctx);
-    for (var i=0,line; line=lines[i], i<lines.length; i++)
-      if (match = line.match(state[0]))
-        for (var j=0; j<match.length; j++)
-          if (match[j] != null && state[1][j]) {
-            state = parser.rules[ state[1][j](match, ctx) ]
-            break;
-          }
-    return ctx;
-  }
-
-  var multipartJSONParser = {
-    initial_state: 'PREAMBLE',
-    initialize: function(ctx) { ctx.content = []; },
-    rules: {
-      PREAMBLE : [ /^--(.*[^-].|.*[^-])$/, {
-        1:function(m, ctx) { ctx.boundary = m[1]; return 'HEADERS'; }}],
-      HEADERS : [ /(^$)|^Content-type:\s*(.*?)(;.*)?$/i, {
-        1:function(m, ctx) { ctx.chunk = []; return 'CONTENT'; },
-        2:function(m, ctx) { 
-          if (m[2] == 'multipart/mixed') return 'PREAMBLE';
-          ctx.skip = (m[2] != 'application/json'); return 'HEADERS'; }}],
-      CONTENT : [ /^--(.*?)--?$|^--(.*)$|^(.*)$/, {
-        1:function(m, ctx) {
-          if ( m[1] != ctx.boundary ) { ctx.chunk.push(m[0]); return 'CONTENT' }
-          if (!ctx.skip) ctx.content.push(JSON.parse(ctx.chunk.join('\n')));
-          return 'PREAMBLE'; },
-        2:function(m, ctx) {
-          if (!ctx.skip && ctx.chunk.length) 
-            ctx.content.push(JSON.parse(ctx.chunk.join('\n')));
-          ctx.boundary = m[2];
-          return 'HEADERS'; },
-        3:function(m, ctx) {ctx.chunk.push(m[0]); return 'CONTENT'; }}]
-    }
-  }
-
-  function multipart_json(body) {
-    return parseCFG( multipartJSONParser, body ).content;
-  }
-
-  function saveGeneration() {
-    var key = encodeURIComponent(simulation)+'-'+lpad(7,generationIndex);
-    request({
-      method:'PUT',
-      url:'/riak/generations/'+key,
-      headers: {
-        'Content-type':'application/json',
-        'x-riak-index-simulation_bin':simulation,
-        'x-riak-index-generation_int':generationIndex+''
-      },
-      body: JSON.stringify(generation)
-    });
-    request({
-      method:'PUT',
-      url:'/riak/checkpoints/'+encodeURIComponent(simulation),
-      headers: {
-        'Content-type':'application/json',
-        Link: '</riak/generations/'+key+'>; riaktag="latest"'
-      },
-      body: JSON.stringify({index:generationIndex})
-    })
+  function extend() {
+    var o = {};
+    for (var i=0,l=arguments.length; i<l; i++)
+      for ( var key in arguments[i] )
+        o[key] = arguments[i][key];
+    return o;
   }
 
   function shuffle(ar) {
     for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
   }
 
-  function lpad(n,d) { return String(Math.pow(10,n) + d).substring(1); }
-
   function initializeTournament() {
+    simulation = extend( {name:simulationName, index:1}, 
+      deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
+
     population = [];
-    while ( population.length < POPULATION_SIZE )
-      population = population.concat( deathmatch.creature.newSpecies( Math.min(SPECIES_SIZE, POPULATION_SIZE-population.length) ) );
+    while ( population.length < simulation.POPULATION_SIZE ) {
+      var size = Math.min(simulation.SPECIES_SIZE, simulation.POPULATION_SIZE-population.length)
+      population = population.concat( deathmatch.creature.newSpecies( size, simulation ) );
+    }
     for ( var i=0, organism; organism = population[i]; i++ )
       organism.index = i;
     startTournament();
@@ -235,13 +166,13 @@
     }
     
     shuffle( population );
-    roundSize = POPULATION_SIZE/2;
+    roundSize = simulation.POPULATION_SIZE/2;
     pairs = deathmatch.contest.pairOpponents( population, roundSize );
 
     roundIndex = 1;
     matchIndex = 0;
-    var header = 'generation ' + generationIndex;
-    if (simulation) header = simulation + ' - ' + header;
+    var header = 'generation ' + simulation.index;
+    if (simulation) header = simulation.name + ' - ' + header;
     el('generation').innerHTML = header;
     el('rounds').innerHTML = '';
     renderRound( roundIndex, pairs );
@@ -249,8 +180,8 @@
   }
 
   function nextGeneration() {
-    population = deathmatch.contest.nextGeneration(generation);
-    generationIndex++;
+    population = deathmatch.contest.nextGeneration(generation, simulation);
+    simulation.index++;
     startTournament();
   }
 
@@ -258,8 +189,8 @@
     round = [];
 
     if ( roundSize < 2 ) {
-      if ( simulation && simulation.length )
-        saveGeneration()
+      if ( simulationName && simulationName.length )
+        deathmatch.store.saveSimulation( simulation, generation)
 
       return nextGeneration();
     }
@@ -346,7 +277,7 @@
   }
 
   function updateMatch() {
-    if ( ! deathmatch.contest.updateMatch( match ) ) {
+    if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
       clearInterval(runInterval);
       runInterval = null;
       matchComplete();
@@ -396,23 +327,25 @@
     matchTimeout = setTimeout( nextMatch, accelerated ? 1 : 1000 );
   }
 
+  function simulationHandler( err, sim, gen ) {
+    if ( err )
+      return initializeTournament();
+
+    simulation = sim;
+    generation = gen;
+    population = generation.population;
+    console.log(simulation,generation);
+    nextGeneration();
+  }
+
   function startSimulation() {
     el('startup').style.display = 'none';
     el('simulation').style.display = 'block';
 
-    simulation = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
+    simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
 
-    if ( simulation ) {
-      request({url:'/riak/checkpoints/'+encodeURIComponent(simulation)+'/_,latest,_/', 
-        handler: function(o) { 
-          generationIndex = o.match(/^x-riak-index-generation_bin: (\d+)/m)[1]|0;
-          generation = multipart_json(o)[0];
-          population = generation.population;
-          nextGeneration();
-        }, 
-        errorHandler:function(o) { 
-          initializeTournament();
-        } });
+    if ( simulationName ) {
+      deathmatch.store.loadSimulation(simulationName, simulationHandler);
     } else {
       initializeTournament();
     }

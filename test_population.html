@@ -50,7 +50,7 @@
     var mate = randItem( species );
     while ( mate === organism )
       mate = randItem( species );
-    return deathmatch.creature.breedOrganisms( organism, mate, stats );
+    return deathmatch.creature.breedOrganisms( organism, mate, deathmatch.creature.DEFAULT_STATS, stats );
   }
   function nextSpeciesGeneration( species, slots ) {
     var speciesNext = [], harem = Math.ceil(slots / 2);

@@ -209,12 +209,12 @@ deathmatch.creature = (function() {
     return count;
   }
 
-  function newSpecies( members ) {
+  function newSpecies( members, rates ) {
     var species = { id: randId(), parent: null };
     var adam = randomOrganism( species ), eve = randomOrganism( species );
     var organisms = [];
     for (var i=0; i<members; i++)
-      organisms.push( breedOrganisms(adam, eve) );
+      organisms.push( breedOrganisms(adam, eve, rates) );
     return organisms;
   }
 
@@ -222,12 +222,12 @@ deathmatch.creature = (function() {
     return { species:species, genome:blockyGenome(), generation:0 };
   }
 
-  function breedOrganisms( organism1, organism2, stats ) {
+  function breedOrganisms( organism1, organism2, rates, stats ) {
     if ( organism1.species.id != organism2.species.id )
       throw new Error( "attempt to breed organisms of different species" );
     return { 
       species:organism1.species, 
-      genome:recombine( organism1.genome, organism2.genome, stats ), 
+      genome:recombine( organism1.genome, organism2.genome, rates, stats ), 
       generation: Math.max(organism1.generation, organism2.generation) + 1
     }
   }
@@ -262,22 +262,23 @@ deathmatch.creature = (function() {
     return genome;
   }
 
-  var MUTATION_NEARNESS = .04,  // smaller number means smaller chance of big mutations
-      GENERAL_MUTATION_RATE = .2,
-      TRAIT_SNP = 1 * GENERAL_MUTATION_RATE,
-      CHILD_SNP = .5 * GENERAL_MUTATION_RATE,
-      TRAIT_SHIFT = .1 * GENERAL_MUTATION_RATE,
-      CHILD_SHIFT = .2 * GENERAL_MUTATION_RATE,
-      CHILD_DUPLICATION = .05 * GENERAL_MUTATION_RATE,
-      CHILD_DELETION = .075 * GENERAL_MUTATION_RATE,
-      CHROMOSOME_DUPLICATION = .4 * GENERAL_MUTATION_RATE,
-      CHROMOSOME_DELETION = .6 * GENERAL_MUTATION_RATE;
+  var DEFAULT_RATES = { 
+    MUTATION_NEARNESS : .04,  // smaller number means smaller chance of big mutations
+    GENERAL_MUTATION_RATE : .2,
+    TRAIT_SNP : 1,
+    CHILD_SNP : .5,
+    TRAIT_SHIFT : .1,
+    CHILD_SHIFT : .2,
+    CHILD_DUPLICATION : .05,
+    CHILD_DELETION : .075,
+    CHROMOSOME_DUPLICATION : .4,
+    CHROMOSOME_DELETION : .6
+  }
 
   function coinFlip() { return Math.random() < .5; }
   function randInt() { return (2*Math.random()-1)*(1<<32); }
   function randId() { var id=[],c='abcdefghijklmnopqrstuvwxyz0123456789A'.split(''); 
                       for (var i=0;i<15; i++) id.push(randItem(c)); return id.join('') }
-  function eventOccurance(probability) { return Math.random() < probability; }
   function randIndex(ar) { return (Math.random() * ar.length)|0; }
   function randItem(ar) { return ar[randIndex(ar)]; }
   function sigmoidDist(slope) { var x=Math.random(); return x < .5 ? Math.pow(2*x,slope)/2 : 1 - Math.pow(2*(1-x),slope)/2; }
@@ -299,8 +300,8 @@ deathmatch.creature = (function() {
    A * ( atan((d-x)/B) - C), where B = sqrt(c), C = atan(d/B), N=-1/(B*(atan((d-1)/B) - C)),  A = -N*B
    inv = d - B*tan((A*C + x) / A)
    */
-  function randomMutation( currentValue ) {
-    var B = Math.sqrt(MUTATION_NEARNESS), C = Math.atan(currentValue/B), 
+  function randomMutation( currentValue, nearness ) {
+    var B = Math.sqrt(nearness), C = Math.atan(currentValue/B), 
         N=-1/(B*(Math.atan((currentValue-1)/B) - C)), A = -N*B;
     return currentValue - B * Math.tan( (A * C + Math.random()) / A);
   }
@@ -362,8 +363,37 @@ deathmatch.creature = (function() {
       delete stats[key];
     }
   }
-  function recombine( parent1, parent2, stats ) {
+  function recombine( parent1, parent2, rates, stats ) {
+    function eventOccurance(type) { return Math.random() < rates[type] * rates.GENERAL_MUTATION_RATE; }
+    function mutate( chromosome ) {
+      if ( eventOccurance('TRAIT_SNP') ) {
+        chromosome[randItem(TRAITS)] = randomMutation(chromosome[randItem(TRAITS)], rates.MUTATION_NEARNESS);
+        statAdd(stats,'trait_snp',1);
+      }
+
+      if ( eventOccurance('CHILD_SNP') ) {
+        var index = randIndex(chromosome.chd);
+        chromosome.chd[index] = Math.max(0, chromosome.chd[index] + (coinFlip() ? 1 : -1));
+        statAdd(stats,'child_snp',1);
+      }
+
+      if ( eventOccurance('CHILD_DUPLICATION') ) {
+        var index = randIndex(chromosome.chd);
+        chromosome.chd.splice(index,0,chromosome.chd[index]);
+        statAdd(stats,'child_dup',1);
+      }
+
+      if ( chromosome.chd.length > 3 && eventOccurance('CHILD_DELETION') ) {
+        var index = randIndex(chromosome.chd);
+        chromosome.chd.splice(index,1);
+        statAdd(stats,'child_dup',1);
+      }
+
+      return chromosome;
+    }
+
     stats = stats || {};
+    rates = rates || DEFAULT_RATES;
     statAdd(stats, 'recombinations', 1);
     var child = [], 
         min = Math.min(parent1.length,parent2.length), 
@@ -382,7 +412,7 @@ deathmatch.creature = (function() {
 
       // handle traitshift mutation
       var donorShift = 0;
-      if ( eventOccurance(TRAIT_SHIFT) ) {
+      if ( eventOccurance('TRAIT_SHIFT') ) {
         donorShift = coinFlip() ? 1 : -1;
         statAdd(stats,'trait_shifts',1);
       }
@@ -403,7 +433,7 @@ deathmatch.creature = (function() {
 
       // handle child shift mutations
       donorShift = 0;
-      if ( eventOccurance(CHILD_SHIFT) ) {
+      if ( eventOccurance('CHILD_SHIFT') ) {
         donorShift = coinFlip() ? 1 : -1;
         statAdd(stats, 'child_shift', 1);
       }
@@ -417,22 +447,22 @@ deathmatch.creature = (function() {
       }
 
       // apply additional mutations to chromosome and clone
-      child.push( mutate(cloner, stats) );
+      child.push( mutate(cloner) );
     }
     for ( i=min; i < max; i++ ) {
-      child.push( mutate( parent1[i] || parent2[i], stats ) );
+      child.push( mutate( parent1[i] || parent2[i] ) );
       statAdd( stats, parent1[i] ? 'clone1' : 'clone2', 1);
     }
 
     // apply chromosome duplication mutation
-    if ( eventOccurance(CHROMOSOME_DUPLICATION) ) {
+    if ( eventOccurance('CHROMOSOME_DUPLICATION') ) {
       var index = randIndex(child);
       child.splice(index,0,child[index]);
       statAdd(stats,'chromosome_dup',1);
     }
 
     // apply chromosome deletion mutation
-    if ( child.length > 1 && eventOccurance(CHROMOSOME_DELETION) ) {
+    if ( child.length > 1 && eventOccurance('CHROMOSOME_DELETION') ) {
       var index = randIndex(child);
       child.splice(index,1);
       statAdd(stats,'chromosome_del',1);
@@ -442,34 +472,8 @@ deathmatch.creature = (function() {
     return child;
   }
 
-  function mutate( chromosome, stats ) {
-    if ( eventOccurance(TRAIT_SNP) ) {
-      chromosome[randItem(TRAITS)] = randomMutation(chromosome[randItem(TRAITS)]);
-      statAdd(stats,'trait_snp',1);
-    }
-
-    if ( eventOccurance(CHILD_SNP) ) {
-      var index = randIndex(chromosome.chd);
-      chromosome.chd[index] = Math.max(0, chromosome.chd[index] + (coinFlip() ? 1 : -1));
-      statAdd(stats,'child_snp',1);
-    }
-
-    if ( eventOccurance(CHILD_DUPLICATION) ) {
-      var index = randIndex(chromosome.chd);
-      chromosome.chd.splice(index,0,chromosome.chd[index]);
-      statAdd(stats,'child_dup',1);
-    }
-
-    if ( chromosome.chd.length > 3 && eventOccurance(CHILD_DELETION) ) {
-      var index = randIndex(chromosome.chd);
-      chromosome.chd.splice(index,1);
-      statAdd(stats,'child_dup',1);
-    }
-
-    return chromosome;
-  }
-
   return {
+    DEFAULT_RATES : DEFAULT_RATES,
     newSpecies: newSpecies,
     generate: generate,
     bounds: bounds,
