@@ -26,6 +26,19 @@ deathmatch.creature = (function() {
   var DENSITY = .01;
   var TRAITS = ['tak','giv','obl','ext','ang','flx'];
 	
+  var DEFAULT_RATES = { 
+    MUTATION_NEARNESS : .04,  // smaller number means smaller chance of big mutations
+    GENERAL_MUTATION_RATE : .2,
+    TRAIT_SNP : 1,
+    CHILD_SNP : .5,
+    TRAIT_SHIFT : .1,
+    CHILD_SHIFT : .2,
+    CHILD_DUPLICATION : .05,
+    CHILD_DELETION : .05,
+    CHROMOSOME_DUPLICATION : .4,
+    CHROMOSOME_DELETION : .6
+  }
+
   var ta = {};
   ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
   ta.multiply=function(t2,t1){ return {a:t1.a*t2.a+t1.b*t2.c, c:t1.c*t2.a+t1.d*t2.c, 
@@ -260,19 +273,6 @@ deathmatch.creature = (function() {
       genome.push(chromosome);
     }
     return genome;
-  }
-
-  var DEFAULT_RATES = { 
-    MUTATION_NEARNESS : .04,  // smaller number means smaller chance of big mutations
-    GENERAL_MUTATION_RATE : .2,
-    TRAIT_SNP : 1,
-    CHILD_SNP : .5,
-    TRAIT_SHIFT : .1,
-    CHILD_SHIFT : .2,
-    CHILD_DUPLICATION : .05,
-    CHILD_DELETION : .075,
-    CHROMOSOME_DUPLICATION : .4,
-    CHROMOSOME_DELETION : .6
   }
 
   function coinFlip() { return Math.random() < .5; }
