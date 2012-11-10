@@ -89,29 +89,29 @@
       .round-index { font-family: 'Helvetica'; font-size:60px; color: #d9d9d9; font-weight: bold;
                      text-shadow: 0 0 4px #999; position: absolute; left: 0; top: 0; }
 
-      .round4 .pair { width:172px;  margin-left: 20px; }
-      .round4 .organism { width:68px; }
-      .round4 canvas { width:68px; }
-
-      .round5 .pair { width:220px;  margin-left: 40px; }
-      .round5 .organism { width:100px; }
-      .round5 canvas { width:100px; }
+      .round5 .pair { width:172px;  margin-left: 20px; }
+      .round5 .organism { width:68px; }
+      .round5 canvas { width:68px; }
 
       .round6 .pair { width:220px;  margin-left: 40px; }
       .round6 .organism { width:100px; }
       .round6 canvas { width:100px; }
+
+      .round7 .pair { width:220px;  margin-left: 40px; }
+      .round7 .organism { width:100px; }
+      .round7 canvas { width:100px; }
 
   </style>
   <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
-  <script type="text/javascript" src="riak-store.js" charset="utf-8"></script>
+  <script type="text/javascript" src="mongo-store.js" charset="utf-8"></script>
   <script language="javascript">
 
   var POPULATION_DEFAULTS = {
-    POPULATION_SIZE : 64,
-    SPECIES_SIZE : 16
+    POPULATION_SIZE : 128,
+    SPECIES_SIZE : 22
   }
   var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex;
   var matchTimeout, simulation, generation, round, simulationName;
@@ -190,7 +190,7 @@
 
     if ( roundSize < 2 ) {
       if ( simulationName && simulationName.length )
-        deathmatch.store.saveSimulation( simulation, generation)
+        deathmatch.store.saveGeneration( simulation, generation)
 
       return nextGeneration();
     }
@@ -209,7 +209,7 @@
 
   function renderRound( roundIndex, pairs ) {
     var rounds = el('rounds');
-    var round = gen('div', 'round round'+roundIndex).add(gen('span','round-index').text(7-roundIndex));
+    var round = gen('div', 'round round'+roundIndex).add(gen('span','round-index').text(roundIndex));
     for ( var i=0,pair; pair = pairs[i]; i++ )
       round.add( gen('div', 'pair', {id:'pair-'+roundIndex+'-'+i} ).add(
         gen('div','organism',{id:'org-'+roundIndex+'-'+i+'-0'})
@@ -328,14 +328,16 @@
   }
 
   function simulationHandler( err, sim, gen ) {
-    if ( err )
-      return initializeTournament();
+    if ( err ) {
+      initializeTournament()
+      deathmatch.store.saveSimulation(simulation);
+      return
+    }
 
     simulation = sim;
     generation = gen;
-    population = generation.population;
-    console.log(simulation,generation);
-    nextGeneration();
+    population = generation.population;      
+    nextGeneration();      
   }
 
   function startSimulation() {
@@ -348,6 +350,7 @@
       deathmatch.store.loadSimulation(simulationName, simulationHandler);
     } else {
       initializeTournament();
+      deathmatch.store.saveSimulation(simulation);
     }
 
     document.onkeypress = function(e) { 

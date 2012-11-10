@@ -38,23 +38,28 @@ function init() {
 
     var ITERATIONS = 30000;
     var BOTTOM = 590;
+    var simulation;
     var BULLET = { x:200, y:300, vx:0, vy:0, leftFacing:false, genome: 
 
+[{"tak":0.587, "giv":0.754, "obl":0.491, "ext":0.466, "ang":0.377, "flx":1.000, "chd":[1,1,1,1,1,1,1,1]},
+ {"obl":0.995, "giv":0.340, "ext":1.000, "tak":0.500, "ang":0.425, "flx":1.000, "chd":[2,1,3]}]        
+        }
+
+     var TARGET = { x:600, y:300, vx:0, vy:0, leftFacing:true, genome : 
 
 [{"tak":0.587, "giv":0.619, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[2,2,1]},
  {"obl":0.140, "giv":0.880, "ext":1.000, "tak":0.765, "ang":0.300, "flx":0.000, "chd":[6,1,5]},
  {"obl":0.500, "giv":0.500, "ext":0.805, "tak":0.105, "ang":0.495, "flx":0.000, "chd":[3,4,4]}]
-           }
-    var TARGET = { x:600, y:300, vx:0, vy:0, leftFacing:true, genome : 
 
-[{"tak":0.587, "giv":0.604, "obl":0.496, "ext":0.466, "ang":0.502, "flx":0.900, "chd":[1,1,1,3,1,1]},
- {"obl":0.500, "giv":0.275, "ext":0.655, "tak":0.085, "ang":0.500, "flx":1.000, "chd":[4,4,4,5,2,4,4,4,4,4]},
- {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.500, "ang":0.525, "flx":0.500, "chd":[4,4,4]},
- {"obl":0.150, "giv":0.860, "ext":1.000, "tak":0.995, "ang":0.500, "flx":0.000, "chd":[4,3,4]}]
-          }
+
+           }
 
     var match;
     var debug = false;
+    var POPULATION_DEFAULTS = {
+      POPULATION_SIZE : 64,
+      SPECIES_SIZE : 16
+    }
 
 /*
 MERCE
@@ -95,12 +100,30 @@ ADA
  {"obl":0.500, "giv":0.275, "ext":0.655, "tak":0.085, "ang":0.500, "flx":1.000, "chd":[4,4,4,5,2,4,4,4,4,4]},
  {"obl":1.000, "giv":0.500, "ext":1.000, "tak":0.500, "ang":0.525, "flx":0.500, "chd":[4,4,4]},
  {"obl":0.150, "giv":0.860, "ext":1.000, "tak":0.995, "ang":0.500, "flx":0.000, "chd":[4,3,4]}]
+
+LOUIS
+[{"tak":0.587, "giv":0.419, "obl":0.491, "ext":0.466, "ang":0.377, "flx":1.000, "chd":[1,1,1,1]},
+ {"obl":0.895, "giv":0.500, "ext":0.980, "tak":0.500, "ang":0.500, "flx":0.000, "chd":[3,1,3]}]
+
+
+[{"tak":0.587, "giv":0.419, "obl":0.391, "ext":0.466, "ang":0.377, "flx":1.000, "chd":[1,1,3,1]},
+ {"obl":0.490, "giv":0.360, "ext":0.500, "tak":0.500, "ang":0.500, "flx":1.000, "chd":[4,4,4,2,5,5,4,2]},
+ {"obl":0.500, "giv":0.500, "ext":0.500, "tak":0.500, "ang":0.500, "flx":0.500, "chd":[0,0,0]},
+ {"obl":0.825, "giv":0.665, "ext":1.000, "tak":0.700, "ang":0.500, "flx":0.000, "chd":[5,3,4]}] }
  */
 
 
     function el(id) { return document.getElementById(id); }
     function childOf(el,clss) { if (! el || el.tagName == 'BODY') return null; return (el.getAttribute('class') === clss ? el : childOf(el.parentNode,clss)); }
     function offset(el) { if ( el.tagName === 'BODY' ) return {left:0, top:0}; var o = offset(el.offsetParent); return {left:o.left+el.offsetLeft, top:o.top+el.offsetTop}; }
+
+    function extend() {
+      var o = {};
+      for (var i=0,l=arguments.length; i<l; i++)
+        for ( var key in arguments[i] )
+          o[key] = arguments[i][key];
+      return o;
+    }
 
     function draw() {
       var ctx = el('display').getContext('2d');
@@ -129,7 +152,7 @@ ADA
 
     var count = 0, joint;
     function physicsUpdate() {
-      if ( ! deathmatch.contest.updateMatch( match ) ) {
+      if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
         console.log("OVER");
         clearInterval(interval);
       }
@@ -147,6 +170,9 @@ ADA
     }
 
     function startMatch() {
+      simulation = extend( {name:'testbed', index:1}, 
+        deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
+
       match = deathmatch.contest.startMatch( {genome:TARGET.genome}, {genome:BULLET.genome} );
  
       if (debug)

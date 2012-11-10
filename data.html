@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>integrity for test-af</title>
+    <script type="text/javascript" src="d3.v2.min.js"></script>
+    <script type="text/javascript" src="riak-store.js"></script>
+    <style type="text/css">
+
+body {
+  font: 10px sans-serif;
+  margin: 0;
+}
+
+svg {
+  display: inline-block;
+}
+
+path.line {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5px;
+}
+
+path.species {
+  stroke: none;
+  fill: rgba(255,52,52,.5);
+  xstroke-width: 1.5px;
+}
+
+path.species.index-1 { fill: rgba(0,150,255,.5); }
+path.species.index-2 { fill: rgba(0,255,50,.5); }
+path.species.index-3 { fill: rgba(255,150,0,.5); }
+
+path.area {
+  fill: #e7e7e7;
+}
+
+.axis {
+  shape-rendering: crispEdges;
+}
+
+.x.axis line {
+  stroke: #fff;
+}
+
+.x.axis .minor {
+  stroke-opacity: .5;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.y.axis line, .y.axis path {
+  fill: none;
+  stroke: #000;
+}
+
+    </style>
+  </head>
+  <body>
+    <script type="text/javascript">
+
+var m = [20, 20, 20, 20],
+    w = 600 - m[1] - m[3],
+    h = 400 - m[0] - m[2],
+    parse = d3.time.format("%b %Y").parse;
+
+// Scales and axes. Note the inverted domain for the y-scale: bigger is up!
+var x = d3.scale.linear().range([0, w]),
+    y = d3.scale.linear().range([h, 0]),
+    speciesY = d3.scale.linear().range([0, h]).domain([63,0]),
+    xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
+    yAxis = d3.svg.axis().scale(y).ticks(8).orient("right");
+
+// An area generator, for the light fill.
+var area = d3.svg.area()
+    .interpolate("monotone")
+    .x(function(d) { return x(d.index); })
+    .y0(h)
+    .y1(function(d) { return y(12600-d.integrity); });
+
+// A line generator, for the dark stroke.
+var line = d3.svg.line()
+    .interpolate("monotone")
+    .x(function(d) { return x(d.index); })
+    .y(function(d) { return y(12600-d.integrity); });
+
+
+var stack = d3.layout.stack()
+    .offset("zero")
+    .values(function(d) { return d.values; });
+
+var speciesArea = d3.svg.area()
+     .x(function(d) { return x(d.x); })
+     .y0(function(d) { return speciesY(d.y0); })
+     .y1(function(d) { return speciesY(d.y0+d.y); });
+
+/*
+function speciesArea( species, speciesIndex ) {
+  function speciesSum(i) { 
+    return function(d) { return species.slice(0,i).reduce(function(a,o) {return speciesY(a + (d.speciesWins[o] || 0))}, 0); }
+  }
+  return d3.svg.area()
+    .interpolate("monotone")
+    .x(function(d) { return x(d.index); })
+    .y0(speciesSum(speciesIndex))
+    .y1(speciesSum(speciesIndex+1))
+}
+*/
+
+function mapper(o, xhr) { 
+  var data = { wins:0, integrity:0, speciesWins:{}, index:xhr.getResponseHeader('x-riak-index-generation_int')|0 }
+  for (var i=0,round; round = o.rounds[i]; i++) {
+    for (var j=0,match; match = round[j]; j++) {
+      if (match.left.winner || match.right.winner) {
+        data.wins++;
+        if ( i > -1 ) {
+          var species = o.population[match.left.winner ? match.left.index : match.right.index].species.id;
+          data.speciesWins[species] = (data.speciesWins[species] || 0) + 1
+        }
+      }
+      data.integrity += match.left.health + match.right.health;
+    }
+  }
+  return data;
+}
+
+function curry(f) {
+  var args = Array.prototype.slice.call(arguments,1);
+  return function() { return f.apply(null, args.concat(arguments)); }
+}
+
+function queryStats( simulation, next ) {
+  console.log('queryStats', simulation)
+  deathmatch.store.mapReduce('/buckets/generations/index/simulation_bin/' + simulation, mapper, function(values) {
+    render(values,simulation);
+    next();
+  } )
+}
+
+(function sync( a, f ) {
+  if ( ! a || ! a.length ) return null;
+  return curry( f, a[0], sync(a.slice(1), f) )
+})(['test-af','test-ag','test-ah','test-ai','test-aj','test-ba','test-bb','test-cc'], queryStats)()
+
+
+function render(values, simulation) {
+  values.sort(function(a,b) { return a.index - b.index; });
+
+  // Compute the minimum and maximum date, and the maximum price.
+  x.domain([values[0].index, values[values.length - 1].index]);
+  y.domain([0, d3.max(values, function(d) { return d.integrity; })]).nice();
+
+  // Add an SVG element with the desired dimensions and margin.
+  d3.select('body').append('h2').text(simulation);
+  var svg = d3.select("body").append("svg:svg")
+      .attr("width", w + m[1] + m[3])
+      .attr("height", h + m[0] + m[2])
+    .append("svg:g")
+      .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+
+  // Add the clip path.
+  svg.append("svg:clipPath")
+      .attr("id", "clip")
+    .append("svg:rect")
+      .attr("width", w)
+      .attr("height", h);
+
+  // Add the area path.
+  svg.append("svg:path")
+      .attr("class", "area")
+      .attr("clip-path", "url(#clip)")
+      .attr("d", area(values));
+
+  // Add the x-axis.
+  svg.append("svg:g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + h + ")")
+      .call(xAxis);
+
+  // Add the y-axis.
+  svg.append("svg:g")
+      .attr("class", "y axis")
+      .attr("transform", "translate(" + w + ",0)")
+      .call(yAxis);
+
+  // Add the line path.
+  svg.append("svg:path")
+      .attr("class", "line")
+      .attr("clip-path", "url(#clip)")
+      .attr("d", line(values));
+
+  // wins graph
+  svg = d3.select("body").append("svg:svg")
+      .attr("width", w + m[1] + m[3])
+      .attr("height", h + m[0] + m[2])
+    .append("svg:g")
+      .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+
+  // Add the x-axis.
+  svg.append("svg:g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + h + ")")
+      .call(xAxis);
+
+  // Render all winning species
+  var species = {}, index=0;
+  values.forEach(function(v) { for (var key in v.speciesWins) species[key] = []; })
+  values.forEach(function(v) { for (var id in species) species[id].push(v.speciesWins[id] || 0) })
+  var layers = d3.entries(species).map(function(o,i) {
+    return {id:o.key, values:o.value.map(function(o,i) {return {x:i,y:o}}), index:i}})
+
+  svg.selectAll("path.species")
+     .data(stack(layers))
+   .enter().append("path")
+     .attr('class', function(d) { return 'species index-' + d.index })
+     .attr("d", function(d) { console.log('d',d); return speciesArea(d.values); });
+
+  /*
+  d3.keys(species).forEach(function(s,i) {
+    // Add the line path.
+    svg.append("svg:path")
+        .attr("class", "species index-"+(index++))
+        .attr("d", speciesArea );
+  })
+*/
+}
+
+    </script>
+  </body>
+</html>

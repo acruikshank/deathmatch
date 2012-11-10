@@ -262,14 +262,14 @@ deathmatch.creature = (function() {
   }
 
   function blockyGenome() {
-    var genome = [], chromosomes = 3;
+    var genome = [], chromosomes = 1;
     for ( var i=0; i < chromosomes; i++ ) {
       var chromosome = {};
       for (var j=0,trait; trait=TRAITS[j]; j++)
-        chromosome[trait] = .5;
+        chromosome[trait] = trait == 'giv' ? 0 : .5;
       chromosome.chd = [];
-      for (var j=0; j< chromosomes - i + 2; j++)
-        chromosome.chd[j] = 5;
+      for (var j=0; j< 3; j++)
+        chromosome.chd[j] = 0;
       genome.push(chromosome);
     }
     return genome;

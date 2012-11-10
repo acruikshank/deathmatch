@@ -9,7 +9,7 @@ deathmatch.store = (function() {
       if ( xhr.readyState < 4 ) return;
       if ((!xhr.status && (location.protocol == "file:")) || (xhr.status >= 200 && xhr.status < 300) 
           || xhr.status == 304 || xhr.status == 1223) {
-        if (options.handler) options.handler(xhr.responseText);
+        if (options.handler) options.handler(xhr.responseText, xhr);
       } else if (options.errorHandler) options.errorHandler(xhr.status)
     };
     xhr.open(options.method || 'GET', options.url, true );
@@ -61,6 +61,33 @@ deathmatch.store = (function() {
     return parseCFG( multipartJSONParser, body ).content;
   }
 
+  function MapJob( mapper, handler ) {
+    var map = [], requestCount = 0;
+
+    function addRequest( url ) {
+      requestCount++;
+      request({url:url, handler: function(o,xhr) { response(null,o,xhr) }, errorHandler:function(err) { response(err) } });
+    }
+
+    function response( err, value, xhr ) {
+      if (err) console.log('ERROR', err)
+      else map.push( mapper( JSON.parse(value), xhr ) );
+      requestCount--;
+      if ( requestCount == 0 )
+        return handler( map );
+    }
+
+    return { request:addRequest };
+  }
+
+  function mapReduce( keysUrl, mapper, handler ) {
+    request({url:keysUrl, handler: function(o) { 
+      var job = MapJob( mapper, handler ), keys = JSON.parse(o).keys;
+      for ( var i=0, key; key = keys[i]; i++ )
+        job.request('/buckets/generations/keys/' + key);
+    }, errorHandler: function(err) { console.log(err); } });
+  }
+
   function loadSimulation(name, handler /* err, simulation, generation */ ) {
     var simulation, generation, complete = false;
     function done() { 
@@ -110,6 +137,7 @@ deathmatch.store = (function() {
 
   return {
     loadSimulation : loadSimulation,
-    saveSimulation : saveSimulation
+    saveSimulation : saveSimulation,
+    mapReduce      : mapReduce
   }
 })();
