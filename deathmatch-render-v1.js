@@ -78,11 +78,44 @@ deathmatch.render = (function() {
     ctx.restore();
   }
 
-  function renderJunk( part, ctx ) {
+  var junkGradient = [];
+  var junkGradientColors = [
+    [255,255,255, 1],
+    [249,255,157, 2],
+    [255,180,  2, 2],
+    [255, 92,  1, 6],
+    [145, 18,  2, 8],
+    [ 40, 36, 42,32]
+  ]
+
+  function interp( a, b, x ) { return parseInt(b + (a-b) * x); }
+  function interpColor( c1, c2, tween ) {
+    var x = tween / c1[3];
+    return "rgb(" + interp(c1[0],c2[0],x) + "," + interp(c1[1],c2[1],x) + "," + interp(c1[2],c2[2],x) + ")"
+  }
+  for (var age=0, i=0, scaled=0, lastColor=junkGradientColors[0], color=lastColor; color; age++ ) {
+    junkGradient[age] = interpColor( color, lastColor, scaled );
+    scaled += .5;
+    if (scaled > color[3]) {
+      scaled -= color[3];
+      lastColor = color;
+      color = junkGradientColors[++i];
+    }
+  }
+  junkGradient.push( interpColor(lastColor, lastColor, 0) );
+  
+  function renderJunk( part, match, ctx ) {
     var s = deathmatch.contest.PIXELS_PER_METER;
     var points = part.body.m_fixtureList.m_shape.m_vertices;
 
     ctx.save();
+
+    var junkAge = match.iterations - part.junked_at;
+    if ( junkAge >= junkGradient.length )
+      ctx.strokeStyle = ctx.fillStyle = junkGradient[junkGradient.length - 1];
+    else
+      ctx.strokeStyle = ctx.fillStyle = junkGradient[junkAge];
+
     ctx.scale( 1/s, 1/s );
     ctx.lineWidth = s;
     var pos = part.body.GetPosition();
@@ -116,7 +149,7 @@ deathmatch.render = (function() {
     ctx.arc( part.origin.x, part.origin.y, size*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
     ctx.fill(); i
     ctx.restore();
-    eachChild( part, drawDamage, ctx, left );
+//    eachChild( part, drawDamage, ctx, left );
   }
 
   function renderCanvas( ctx, match ) {
@@ -126,10 +159,10 @@ deathmatch.render = (function() {
     ctx.fillStyle = 'rgba(40,40,40,.3)';
     ctx.strokeStyle = '#666';
     for ( var id in match.junk )
-      renderJunk( match.junk[id], ctx );
+      renderJunk( match.junk[id], match, ctx );
 
-    ctx.fillStyle = 'rgba(0,0,0,.2)';
-    ctx.strokeStyle = 'rgba(255,255,255,.7)';
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
     if ( ! match.rightCreature.junk )
       render( match.rightCreature, ctx );
     if ( ! match.leftCreature.junk ) 

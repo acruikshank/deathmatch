@@ -78,7 +78,7 @@ connect(function() {
   generations(function(err,collection) {
     collection.ensureIndex('key');
     collection.ensureIndex('simulation');
-    collection.ensureIndex('generation');
+    collection.ensureIndex('index');
   })
 })
 
@@ -106,12 +106,25 @@ app.put('/simulations/:key', function( request, response, next ) {
 
 app.get('/latest-generation/:simulation', function( request, response, next ) {
   generations(function(err,collection) {
-    collection.aggregate([{$match:{simulation:request.params.key}},{$sort:{generation:-1}},{$limit:1}], function(err,g) { 
-      if (g && g.length)
-        response.send(g[0]); 
+    collection.aggregate([
+      {$project:{simulation:1,index:1}},
+      {$match:{simulation:request.params.simulation}},
+      {$sort:{index:-1}},
+      {$limit:1}], 
+      fetchById)
+
+    function fetchById( err, result ) {
+      if (!err && result && result.length)
+        collection.findOne({_id:result[0]._id}, send);
       else
-        response.send(404)
-    });
+        return response.send(404);
+    }
+
+    function send( err, generation ) {
+      if (err)
+        response.send(500);
+      response.send(generation);
+    }
   })
 })
 

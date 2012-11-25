@@ -567,8 +567,14 @@ deathmatch.contest = (function() {
 
   function assessDamage( part, match ) {
     var totalDamage = 0, health = part.health;
-    for ( var id in health.blows ) totalDamage += health.blows[id].damage
-    health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
+    for ( var id in health.blows ) totalDamage += health.blows[id].damage;
+    var damage = blowDamage( totalDamage, part );
+    health.instant_integrity = health.integrity - damage;
+
+    if ( totalDamage > 0 ) {
+      part.last_hit_at = match.iterations;
+      part.last_hit = damage;
+    }
 
     if ( part.health.instant_integrity <= 0 ) {
       junkify( part, match );
@@ -583,6 +589,7 @@ deathmatch.contest = (function() {
     filterData.groupIndex = 0;
     part.body.m_fixtureList.SetFilterData(filterData);
     part.junk = true;
+    part.junked_at = match.iterations;
     match.junk[part.body.id] = part;
     part.health.integrity = 1;
 

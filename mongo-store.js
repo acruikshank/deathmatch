@@ -47,7 +47,7 @@ deathmatch.store = (function() {
 
   function saveGeneration( simulation, generation ) {
     var key = encodeURIComponent(simulation.name)+'-'+lpad(7,simulation.index);
-    generation.simlulation = simulation.name;
+    generation.simulation = simulation.name;
     generation.index = simulation.index;
     request({
       method:'PUT',
