@@ -6,7 +6,14 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Evolve</title>
   <style type="text/css">
-      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #ccc; color:#fff; width:100%; margin:0; }
+      body { 
+        font-family:Helvetica,Arial,sans-serif; 
+        font-size:.83em; 
+        background-color: #666; 
+        color:#ccc; 
+        width:100%; 
+        margin:0; 
+      }
 
       #simulation { display: none; }
       #startup .name {
@@ -14,9 +21,9 @@
         margin: 100px auto 20px;
         font-family: Helvetica,Arial,serif;
         font-size: 18px;
-        color: white;
+        color: #ccc;
         font-weight: bold;
-        text-shadow: 0 0 4px #666;
+        text-shadow: 0 0 4px #000;
       }
       #simulation_name {
         border: none;
@@ -63,9 +70,9 @@
         padding:0;
         font-family: 'Helvetica';
         font-size:30px; 
-        color: #d9d9d9; 
+        color: #999; 
         font-weight: bold;
-        text-shadow: 0 0 6px #999;
+        text-shadow: 0 0 6px #333;
         text-align: center;      
       }
       .pair { 
@@ -86,8 +93,8 @@
         display: inline-block; width: 34px; margin-right: 10px;
       }
       .pair canvas { width:34px; border: 1px solid #b3b3b3; }
-      .round-index { font-family: 'Helvetica'; font-size:60px; color: #d9d9d9; font-weight: bold;
-                     text-shadow: 0 0 4px #999; position: absolute; left: 0; top: 0; }
+      .round-index { font-family: 'Helvetica'; font-size:60px; color: #999; font-weight: bold;
+                     text-shadow: 0 0 4px #333; position: absolute; left: 0; top: 0; }
 
       .round5 .pair { width:172px;  margin-left: 20px; }
       .round5 .organism { width:68px; }
@@ -231,10 +238,14 @@
       var cvs = el('cvs-'+roundIndex+'-'+i+'-0');
       cvs.setAttribute('height', cvs.offsetHeight * 2);
       cvs.setAttribute('width', cvs.offsetWidth * 2);
+      cvs.getContext('2d').fillStyle = 'rgb(0,0,0)';
+      cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
       renderCreature(cvs.getContext('2d'), pair[0].genome )
       cvs = el('cvs-'+roundIndex+'-'+i+'-1');
       cvs.setAttribute('height', cvs.offsetHeight * 2);
       cvs.setAttribute('width', cvs.offsetWidth * 2);
+      cvs.getContext('2d').fillStyle = 'rgb(0,0,0)';
+      cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
       renderCreature(cvs.getContext('2d'), pair[1].genome )
     }
 
@@ -280,16 +291,12 @@
     if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
       clearInterval(runInterval);
       runInterval = null;
-      matchComplete();
+      return matchComplete();
     }
 
     if ( ! accelerated ) {
       var ctx = el('display').getContext('2d');
-
-      ctx.fillStyle = 'rgba(100,100,100,.8)';
-      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-
-      deathmatch.render.renderCanvas(ctx, match);
+      deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor);
     }
   }
 
@@ -298,23 +305,14 @@
 
     var ctx = el('display').getContext('2d');
     
-    if ( accelerated ) {
-      ctx.fillStyle = 'rgba(52,82,122,1)';
-      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-
-      deathmatch.render.renderCanvas(ctx, match);
-    } else if ( match.iterations == 0 ) {
-      ctx.fillStyle = 'rgba(52,82,122,1)';
-      ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-
-      deathmatch.render.renderCanvas(ctx, match);
-    }
+    if ( accelerated || ! match.iteration )
+      deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor, true);
 
     el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair complete');
     var ctx = el('display').getContext('2d');
     ctx.font = 'bold 50px Helvetica';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,1)';
+    ctx.fillStyle = 'rgba(255,255,255,.8)';
     ctx.fillText(match.result, 400, 200);
     if ( ! pairs.length ) {
       generation.rounds.push(round);
@@ -368,8 +366,12 @@
 
   function init() {
     el('continue').onclick = startSimulation;
-    el('simulation_name').onkeyup = function() {
+    el('simulation_name').onkeypress = function(e) {
       el('continue').innerHTML = el('simulation_name').value.match(/\S/) ? 'begin' : 'skip';
+      if (e.keyCode == 13) {
+        startSimulation()
+        return false;
+      }
     }
     el('simulation_name').focus();
   }

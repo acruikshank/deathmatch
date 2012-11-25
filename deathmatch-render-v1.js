@@ -1,13 +1,36 @@
 deathmatch = window.deathmatch || {};
 deathmatch.render = (function() {
 
+  var MATCH_BACKGROUND = 'rgba(40,40,40,.8)';
+  var MATCH_BACKGROUND_HARD = 'rgb(40,40,40)';
+
   function eachChild( part, f, arg1, arg2 ) {
     if (part.children) 
       for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
         if (child) f( child, arg1, arg2 );
   }
 
+  function hsvTransform( color, H, S, V) {
+    var VSU = V*S*Math.cos(H*Math.PI/180);
+    var VSW = V*S*Math.sin(H*Math.PI/180);
+    return {
+      r : (.299*V+.701*VSU+.168*VSW)*color.r + (.587*V-.587*VSU+.330*VSW)*color.g + (.114*V-.114*VSU-.497*VSW)*color.b,
+      g : (.299*V-.299*VSU-.328*VSW)*color.r + (.587*V+.413*VSU+.035*VSW)*color.g + (.114*V-.114*VSU+.292*VSW)*color.b,
+      b : (.299*V-.3*VSU+1.25*VSW)*color.r + (.587*V-.588*VSU-1.05*VSW)*color.g + (.114*V+.886*VSU-.203*VSW)*color.b }
+  }
+
+  var partFillColors = [], partStrokeColors = [];
+  function colorString(c,alpha) { return 'rgba('+(c.r|0)+','+(c.g|0)+','+(c.b|0)+','+alpha+')' }
+  for (var i=0; i<360; i++) {
+    partFillColors.push( colorString(hsvTransform({r:110,g:110,b:255}, i*2, 1, 1),'.55') )
+    partStrokeColors.push( colorString(hsvTransform({r:75,g:75,b:255}, i*2, 1, 1),'1') )
+  }
+
   function render( part, ctx, genome ) {
+    var colorIndex = (part.type+1) * part.depth*5;
+    ctx.fillStyle = partFillColors[colorIndex % partFillColors.length];
+    ctx.strokeStyle = partStrokeColors[colorIndex % partFillColors.length];
+
     var s = deathmatch.contest.PIXELS_PER_METER;
 
     genome = genome || part.genome;
@@ -15,7 +38,7 @@ deathmatch.render = (function() {
 
     ctx.save();
     ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = s;
+    ctx.lineWidth = 2*s;
     ctx.translate( part.origin.x, part.origin.y );
     ctx.rotate( part.theta );
     ctx.scale( part.oblong, 1 / part.oblong );
@@ -85,17 +108,17 @@ deathmatch.render = (function() {
     [255,180,  2, 2],
     [255, 92,  1, 6],
     [145, 18,  2, 8],
-    [ 40, 36, 42,32]
+    [ 20, 18, 21,32]
   ]
 
   function interp( a, b, x ) { return parseInt(b + (a-b) * x); }
   function interpColor( c1, c2, tween ) {
     var x = tween / c1[3];
-    return "rgb(" + interp(c1[0],c2[0],x) + "," + interp(c1[1],c2[1],x) + "," + interp(c1[2],c2[2],x) + ")"
+    return "rgba(" + interp(c1[0],c2[0],x) + "," + interp(c1[1],c2[1],x) + "," + interp(c1[2],c2[2],x) + ","
   }
   for (var age=0, i=0, scaled=0, lastColor=junkGradientColors[0], color=lastColor; color; age++ ) {
     junkGradient[age] = interpColor( color, lastColor, scaled );
-    scaled += .5;
+    scaled += .35;
     if (scaled > color[3]) {
       scaled -= color[3];
       lastColor = color;
@@ -103,18 +126,17 @@ deathmatch.render = (function() {
     }
   }
   junkGradient.push( interpColor(lastColor, lastColor, 0) );
-  
+
   function renderJunk( part, match, ctx ) {
     var s = deathmatch.contest.PIXELS_PER_METER;
     var points = part.body.m_fixtureList.m_shape.m_vertices;
 
     ctx.save();
 
-    var junkAge = match.iterations - part.junked_at;
-    if ( junkAge >= junkGradient.length )
-      ctx.strokeStyle = ctx.fillStyle = junkGradient[junkGradient.length - 1];
-    else
-      ctx.strokeStyle = ctx.fillStyle = junkGradient[junkAge];
+    var junkAge = parseInt((match.iterations - part.junked_at) * part.mass);
+    var color = junkGradient[junkAge] || junkGradient[junkGradient.length - 1];
+    ctx.strokeStyle = color + '1)';
+    ctx.fillStyle = color + '.75)';
 
     ctx.scale( 1/s, 1/s );
     ctx.lineWidth = s;
@@ -152,17 +174,16 @@ deathmatch.render = (function() {
 //    eachChild( part, drawDamage, ctx, left );
   }
 
-  function renderCanvas( ctx, match ) {
+  function renderCanvas( ctx, match, background, hard ) {
+    ctx.fillStyle = hard ? MATCH_BACKGROUND_HARD : MATCH_BACKGROUND;
+    ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
     ctx.save();
     ctx.lineWidth = deathmatch.contest.PIXELS_PER_METER;
 
-    ctx.fillStyle = 'rgba(40,40,40,.3)';
-    ctx.strokeStyle = '#666';
     for ( var id in match.junk )
       renderJunk( match.junk[id], match, ctx );
 
-    ctx.fillStyle = 'rgba(0,0,0,.4)';
-    ctx.strokeStyle = 'rgba(255,255,255,.4)';
     if ( ! match.rightCreature.junk )
       render( match.rightCreature, ctx );
     if ( ! match.leftCreature.junk ) 
@@ -172,8 +193,8 @@ deathmatch.render = (function() {
     if ( ! match.rightCreature.junk )
       drawDamage( match.rightCreature, ctx, false );
 
-    ctx.fillStyle = '#ccc';
-    ctx.strokeStyle = '#000';
+    ctx.fillStyle = background;
+    ctx.strokeStyle = 'rgba(0,0,0,.8)';
     ctx.lineWidth = 1;
     renderCage(ctx, match);
     ctx.restore();    

@@ -88,6 +88,7 @@ deathmatch.creature = (function() {
     var creature = { type:0, mass:MASS, transform:new T(transform.t), genome:genome, joints:[], leftFacing:leftFacing };
     var generation = [ creature ];
     var next_generation;
+    var depth=0;
     creature.transform.scale( PIXELS_PER_METER, PIXELS_PER_METER );
 
     while ( generation.length > 0 ) {
@@ -129,6 +130,7 @@ deathmatch.creature = (function() {
         part.transform.translate( 0, ext );
 
         part.origin = part.transform.project({x:0,y:0});
+        part.depth = depth;
 
         var half_angle = Math.PI / type.chd.length;
         var work_transform = part.transform.clone().scale(1/obl,obl);
@@ -168,6 +170,7 @@ deathmatch.creature = (function() {
         if ( part.children ) next_generation = next_generation.concat( part.children );
       }
       generation = next_generation;
+      depth++;
     }
 
     return creature;
