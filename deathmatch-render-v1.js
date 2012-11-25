@@ -10,6 +10,7 @@ deathmatch.render = (function() {
         if (child) f( child, arg1, arg2 );
   }
 
+  // COLOR MATH
   function hsvTransform( color, H, S, V) {
     var VSU = V*S*Math.cos(H*Math.PI/180);
     var VSW = V*S*Math.sin(H*Math.PI/180);
@@ -19,17 +20,59 @@ deathmatch.render = (function() {
       b : (.299*V-.3*VSU+1.25*VSW)*color.r + (.587*V-.588*VSU-1.05*VSW)*color.g + (.114*V+.886*VSU-.203*VSW)*color.b }
   }
 
-  var partFillColors = [], partStrokeColors = [];
   function colorString(c,alpha) { return 'rgba('+(c.r|0)+','+(c.g|0)+','+(c.b|0)+','+alpha+')' }
-  for (var i=0; i<360; i++) {
-    partFillColors.push( colorString(hsvTransform({r:110,g:110,b:255}, i*2, 1, 1),'.55') )
-    partStrokeColors.push( colorString(hsvTransform({r:75,g:75,b:255}, i*2, 1, 1),'1') )
+  function interp( a, b, x ) { return parseInt(a + (b-a) * x); }
+  function interpColor( c1, c2, x ) {
+    return {r:interp(c1.r,c2.r,x), g:interp(c1.g,c2.g,x), b:interp(c1.b,c2.b,x)}
   }
 
-  function render( part, ctx, genome ) {
+  // PRE-COMPUTED COLORS
+  var baseFillColor = {r:110,g:110,b:255};
+  var baseStrokeColor = {r:75,g:75,b:255};
+  var deadFillColor = hsvTransform(baseFillColor, 0, 0, 1);
+  var deadStrokeColor = hsvTransform(baseStrokeColor, 0, 0, 1);
+  var partFillColors = [], partStrokeColors = [], junkGradient = [];
+  var junkGradientColors = [
+    [{r:255, g:255, b:255}, 1],
+    [{r:249, g:255, b:157}, 2],
+    [{r:255, g:180, b:  2}, 2],
+    [{r:255, g: 92, b:  1}, 6],
+    [{r:145, g: 18, b:  2}, 8],
+    [{r: 20, g: 18, b: 21},32]
+  ]
+
+  for (var i=0; i<360; i++) {
+    partFillColors.push( hsvTransform(baseFillColor, i*2, 1, 1) )
+    partStrokeColors.push( hsvTransform(baseStrokeColor, i*2, 1, 1) )
+  }
+
+  for (var age=0, i=0, scaled=0, lastColor=junkGradientColors[0], color=lastColor; color; age++ ) {
+    junkGradient[age] = interpColor( lastColor[0], color[0], scaled / color[1] );
+    scaled += .35;
+    if (scaled > color[1]) {
+      scaled -= color[1]; lastColor = color; color = junkGradientColors[++i]; 
+    }
+  }
+  junkGradient.push( interpColor(lastColor[0], lastColor[0], 0) );
+
+  function render( part, match, ctx, genome ) {
     var colorIndex = (part.type+1) * part.depth*5;
-    ctx.fillStyle = partFillColors[colorIndex % partFillColors.length];
-    ctx.strokeStyle = partStrokeColors[colorIndex % partFillColors.length];
+
+    var strokeColor = partStrokeColors[colorIndex % partFillColors.length];
+    strokeColor = interpColor(deadStrokeColor, strokeColor, part.health.instant_integrity);
+
+    var fillColor = partFillColors[colorIndex % partFillColors.length];
+    fillColor = interpColor(deadFillColor, fillColor, part.health.instant_integrity);
+
+    if ( match && part.last_hit_at  && match.iterations - part.last_hit_at < 20 ) {
+      var glowProgress = 1 - (match.iterations - part.last_hit_at) / 20;
+      var junkColor =  junkGradient[ (junkGradient.length - (junkGradient.length * glowProgress)) |0 ];
+      fillColor = interpColor( junkColor, fillColor, Math.max(0,1 - (glowProgress * part.last_hit)*2) );
+      strokeColor = interpColor( junkColor, strokeColor, Math.max(0,1 - (glowProgress * part.last_hit)*2) );
+    }
+
+    ctx.fillStyle = colorString(fillColor,'.55');
+    ctx.strokeStyle = colorString(strokeColor,'1');
 
     var s = deathmatch.contest.PIXELS_PER_METER;
 
@@ -57,7 +100,7 @@ deathmatch.render = (function() {
 
     if (part.children) {
       for ( var i=0,c=part.children,l=c.length,child; child=c[i], i<l; i++ ) {
-        if (child) render( child, ctx, genome );
+        if (child) render( child, match, ctx, genome );
       }
     }
   }
@@ -78,7 +121,7 @@ deathmatch.render = (function() {
       ctx.translate( -bounds.x, -bounds.y + (ctx.canvas.height / widthRatio - bounds.height) / 2 );
     }
 
-    render(creature,ctx);
+    render(creature, null, ctx);
     ctx.restore();
   }
 
@@ -101,31 +144,6 @@ deathmatch.render = (function() {
     ctx.restore();
   }
 
-  var junkGradient = [];
-  var junkGradientColors = [
-    [255,255,255, 1],
-    [249,255,157, 2],
-    [255,180,  2, 2],
-    [255, 92,  1, 6],
-    [145, 18,  2, 8],
-    [ 20, 18, 21,32]
-  ]
-
-  function interp( a, b, x ) { return parseInt(b + (a-b) * x); }
-  function interpColor( c1, c2, tween ) {
-    var x = tween / c1[3];
-    return "rgba(" + interp(c1[0],c2[0],x) + "," + interp(c1[1],c2[1],x) + "," + interp(c1[2],c2[2],x) + ","
-  }
-  for (var age=0, i=0, scaled=0, lastColor=junkGradientColors[0], color=lastColor; color; age++ ) {
-    junkGradient[age] = interpColor( color, lastColor, scaled );
-    scaled += .35;
-    if (scaled > color[3]) {
-      scaled -= color[3];
-      lastColor = color;
-      color = junkGradientColors[++i];
-    }
-  }
-  junkGradient.push( interpColor(lastColor, lastColor, 0) );
 
   function renderJunk( part, match, ctx ) {
     var s = deathmatch.contest.PIXELS_PER_METER;
@@ -135,8 +153,8 @@ deathmatch.render = (function() {
 
     var junkAge = parseInt((match.iterations - part.junked_at) * part.mass);
     var color = junkGradient[junkAge] || junkGradient[junkGradient.length - 1];
-    ctx.strokeStyle = color + '1)';
-    ctx.fillStyle = color + '.75)';
+    ctx.strokeStyle = colorString(color,'1');
+    ctx.fillStyle = colorString(color,'.75');
 
     ctx.scale( 1/s, 1/s );
     ctx.lineWidth = s;
@@ -185,9 +203,9 @@ deathmatch.render = (function() {
       renderJunk( match.junk[id], match, ctx );
 
     if ( ! match.rightCreature.junk )
-      render( match.rightCreature, ctx );
+      render( match.rightCreature, match, ctx );
     if ( ! match.leftCreature.junk ) 
-      render( match.leftCreature, ctx );
+      render( match.leftCreature, match, ctx );
     if ( ! match.leftCreature.junk ) 
       drawDamage( match.leftCreature, ctx, true );
     if ( ! match.rightCreature.junk )
