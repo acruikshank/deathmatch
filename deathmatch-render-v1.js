@@ -31,7 +31,7 @@ deathmatch.render = (function() {
   var baseStrokeColor = {r:75,g:75,b:255};
   var deadFillColor = hsvTransform(baseFillColor, 0, 0, 1);
   var deadStrokeColor = hsvTransform(baseStrokeColor, 0, 0, 1);
-  var partFillColors = [], partStrokeColors = [], junkGradient = [];
+  var partFillColors = [], partStrokeColors = [], junkGradient = [], speciesPalette=[], speciesColors={};
   var junkGradientColors = [
     [{r:255, g:255, b:255}, 1],
     [{r:249, g:255, b:157}, 2],
@@ -40,6 +40,30 @@ deathmatch.render = (function() {
     [{r:145, g: 18, b:  2}, 8],
     [{r: 20, g: 18, b: 21},32]
   ]
+
+  function initSpeciesColors(population) {
+    speciesColors={};
+    var species = {}, speciesList = [];
+    for ( var i=0, organism; organism = population[i]; i++ ) species[organism.species.id] = true;
+    for (var id in species) speciesList.push(id);
+    speciesList.sort()
+    for ( var i=0, id; id = speciesList[i]; i++ ) speciesColors[id] = speciesPalette[i%speciesPalette.length];
+  }
+
+  var primaries = [0,120,240]
+  var secondaries = [60,180,300];
+  var tertiaries = [30,90,120,150,180,210,240,270,280,310,340];
+  var color1 = {r:190, g:60, b:80}, color2 = {r:200, g:160, b:10}, color3 = {r:40, g:190, b:210};
+
+  speciesPalette = speciesPalette.concat( primaries.map(function(r) { return colorString(hsvTransform(color1,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( primaries.map(function(r) { return colorString(hsvTransform(color2,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( secondaries.map(function(r) { return colorString(hsvTransform(color2,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( primaries.map(function(r) { return colorString(hsvTransform(color3,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( secondaries.map(function(r) { return colorString(hsvTransform(color1,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( secondaries.map(function(r) { return colorString(hsvTransform(color3,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( tertiaries.map(function(r) { return colorString(hsvTransform(color1,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( tertiaries.map(function(r) { return colorString(hsvTransform(color2,r,1,1),'1') }) )
+  speciesPalette = speciesPalette.concat( tertiaries.map(function(r) { return colorString(hsvTransform(color3,r,1,1),'1') }) )
 
   for (var i=0; i<360; i++) {
     partFillColors.push( hsvTransform(baseFillColor, i*2, 1, 1) )
@@ -172,23 +196,24 @@ deathmatch.render = (function() {
     ctx.restore();
   }
 
-  function drawDamage( part, ctx, left ) {
+  function drawDamage( creature, organism, ctx, left ) {
     var size = .2;
     var s = deathmatch.contest.PIXELS_PER_METER;
     ctx.save();
     ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = s;
+    ctx.lineWidth = 2*s;
     ctx.beginPath();
-    ctx.arc( part.origin.x, part.origin.y, size*part.mass*s, 0, 2*Math.PI, true );
-    ctx.fillStyle = left ? '#00f' : '#0d0';
+    ctx.arc( creature.origin.x, creature.origin.y, 5*s, 0, 2*Math.PI, true );
+    ctx.fillStyle = speciesColors[organism.species.id] || '#fff';
     ctx.fill();
-    ctx.fillStyle = ctx.strokeStyle = '#fff'; 
+    ctx.strokeStyle = 'rgb(40,40,40)'; 
     ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc( part.origin.x, part.origin.y, size*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
-    ctx.fill(); i
     ctx.restore();
+
+//    ctx.beginPath();
+//    ctx.arc( part.origin.x, part.origin.y, size*part.mass*Math.max(0,part.health.instant_integrity)*s, 0, 2*Math.PI, true );
+//    ctx.fill();
+//    ctx.restore();
 //    eachChild( part, drawDamage, ctx, left );
   }
 
@@ -206,10 +231,11 @@ deathmatch.render = (function() {
       render( match.rightCreature, match, ctx );
     if ( ! match.leftCreature.junk ) 
       render( match.leftCreature, match, ctx );
+
     if ( ! match.leftCreature.junk ) 
-      drawDamage( match.leftCreature, ctx, true );
+      drawDamage( match.leftCreature, match.leftOrganism, ctx, true );
     if ( ! match.rightCreature.junk )
-      drawDamage( match.rightCreature, ctx, false );
+      drawDamage( match.rightCreature, match.rightOrganism, ctx, false );
 
     ctx.fillStyle = background;
     ctx.strokeStyle = 'rgba(0,0,0,.8)';
@@ -223,6 +249,7 @@ deathmatch.render = (function() {
     renderCage : renderCage,
     renderJunk: renderJunk,
     renderCanvas: renderCanvas,
-    renderToFit: renderToFit
+    renderToFit: renderToFit,
+    initSpeciesColors: initSpeciesColors
 	}
 })()

@@ -176,6 +176,8 @@
     roundSize = simulation.POPULATION_SIZE/2;
     pairs = deathmatch.contest.pairOpponents( population, roundSize );
 
+    deathmatch.render.initSpeciesColors(population);
+
     roundIndex = 1;
     matchIndex = 0;
     var header = 'generation ' + simulation.index;
@@ -238,13 +240,13 @@
       var cvs = el('cvs-'+roundIndex+'-'+i+'-0');
       cvs.setAttribute('height', cvs.offsetHeight * 2);
       cvs.setAttribute('width', cvs.offsetWidth * 2);
-      cvs.getContext('2d').fillStyle = 'rgb(0,0,0)';
+      cvs.getContext('2d').fillStyle = 'rgb(40,40,40)';
       cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
       renderCreature(cvs.getContext('2d'), pair[0].genome )
       cvs = el('cvs-'+roundIndex+'-'+i+'-1');
       cvs.setAttribute('height', cvs.offsetHeight * 2);
       cvs.setAttribute('width', cvs.offsetWidth * 2);
-      cvs.getContext('2d').fillStyle = 'rgb(0,0,0)';
+      cvs.getContext('2d').fillStyle = 'rgb(40,40,40)';
       cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
       renderCreature(cvs.getContext('2d'), pair[1].genome )
     }
