@@ -130,9 +130,10 @@ app.get('/latest-generation/:simulation', function( request, response, next ) {
 
 app.get('/generations/:key', function( request, response, next ) {
   return find(generations, {key:request.params.key}, withResult);
-  function withResult(err, generations) {
+  function withResult(err, generation) {
     if (err) return next(err);
-    return response.send(result);
+    if ( generation != null )
+      response.send(generation);
   }
 })
 

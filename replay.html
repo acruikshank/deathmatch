@@ -4,7 +4,7 @@
 <html lang="en">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>Evolve</title>
+  <title>Replay</title>
   <style type="text/css">
       body { 
         font-family:Andale Mono,Helvetica,Arial,sans-serif; 
@@ -25,7 +25,18 @@
         font-weight: bold;
         text-shadow: 0 0 4px #444;
       }
-      #simulation_name {
+      #startup ul {
+        list-style: none;
+        margin:0;
+        padding:0;
+      }
+      #startup li {
+        margin:0;
+        padding:0;
+        text-align: right;
+      }
+      #simulation_name, #generation_index {
+        outline: none;
         border: none;
         padding: 4px 6px;
         width: 180px;
@@ -36,6 +47,7 @@
         box-shadow: 0 0 4px #999;
       }
       #continue {
+        outline: none;
         -webkit-appearance: none;
         border: none;
         border-radius: 4px;
@@ -81,13 +93,15 @@
         margin: 10px 10px 0;
         padding: 5px 0 5px 10px;
         border: 1px solid transparent;
+        opacity: .5;
+        cursor: pointer;
       }
       .pair.active {
         background: rgba(255,255,0,.25);
         border: 1px solid rgba(255,255,0,.333);
+        opacity: 1;
       }
       .pair.complete {
-        opacity: .25;
       }
       .pair .organism { 
         display: inline-block; width: 34px; margin-right: 10px;
@@ -123,6 +137,7 @@
   var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex;
   var matchTimeout, simulation, generation, round, simulationName;
   var accelerated = false;
+  var rounds;
   var state = 'PRE_TOURNAMENT';
 
   function el(id) { return document.getElementById(id); }
@@ -144,27 +159,7 @@
     return o;
   }
 
-  function shuffle(ar) {
-    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
-  }
-
-  function initializeTournament() {
-    simulation = extend( {name:simulationName, index:1}, 
-      deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
-
-    population = [];
-    while ( population.length < simulation.POPULATION_SIZE ) {
-      var size = Math.min(simulation.SPECIES_SIZE, simulation.POPULATION_SIZE-population.length)
-      population = population.concat( deathmatch.creature.newSpecies( size, simulation ) );
-    }
-    for ( var i=0, organism; organism = population[i]; i++ )
-      organism.index = i;
-    startTournament();
-  }
-
   function startTournament() {
-    generation = {population:population, rounds:[]}
-    round = [];
 
     // initialize stats
     for ( var i=0, l=population.length; i<l; i++ ) {
@@ -172,46 +167,28 @@
       population[i].score = 0;
     }
     
-    shuffle( population );
-    roundSize = simulation.POPULATION_SIZE/2;
-    pairs = deathmatch.contest.pairOpponents( population, roundSize );
-
     deathmatch.render.initSpeciesColors(population);
 
-    roundIndex = 1;
+    roundIndex = 0;
     matchIndex = 0;
     var header = 'generation ' + simulation.index;
     if (simulation) header = simulation.name + ' - ' + header;
     el('generation').innerHTML = header;
     el('rounds').innerHTML = '';
-    renderRound( roundIndex, pairs );
-    nextMatch();
-  }
 
-  function nextGeneration() {
-    population = deathmatch.contest.nextGeneration(generation, simulation);
-    simulation.index++;
-    startTournament();
+    for ( var i=0, round; round = rounds[i]; i++ )
+      renderRound( i+1, round );
+    nextRound();
   }
 
   function nextRound() {
-    round = [];
+    pairs = rounds[roundIndex]
 
-    if ( roundSize < 2 ) {
-      if ( simulationName && simulationName.length )
-        deathmatch.store.saveGeneration( simulation, generation)
-
-      return nextGeneration();
-    }
-
-    roundSize /= 2;
-
-    population.sort( deathmatch.contest.compareOpponents );
-    pairs = deathmatch.contest.pairOpponents( population, roundSize );
+    if ( ! pairs )
+      return;
 
     roundIndex++;
     matchIndex = 0;
-    renderRound( roundIndex, pairs );
 
     nextMatch();
   }
@@ -268,8 +245,8 @@
 
   function nextMatch() {
     el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair active');
-    var pair = pairs.splice(0,1)[0];
-    match = deathmatch.contest.startMatch( pair[0], pair[1] );
+    var pair = pairs[matchIndex];
+    match = deathmatch.contest.startMatch( pair[0], pair[1], pair.floorSlope );
     if ( match.result ) // immediate disqualification
       return matchComplete();
 
@@ -303,8 +280,6 @@
   }
 
   function matchComplete() {
-    round.push( deathmatch.contest.matchSummary(match) );
-
     var ctx = el('display').getContext('2d');
     
     if ( accelerated || ! match.iteration )
@@ -316,41 +291,87 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(match.result, 400, 80);
-    if ( ! pairs.length ) {
+    matchIndex++;
+    if ( matchIndex >= pairs.length ) {
       generation.rounds.push(round);
       state = 'PRE_ROUND';
       return matchTimeout = setTimeout( nextRound, accelerated ? 1 : 1000 );
     }
 
-    matchIndex++;
     state = 'PRE_MATCH';
     matchTimeout = setTimeout( nextMatch, accelerated ? 1 : 1000 );
   }
 
+  function hasClass(el, clss) {
+    return !!(el.getAttribute('class')||'').match(new RegExp("(\\s+|^)"+clss+"(\\s+|$)"));
+  }
+
+  function findPair( el ) {
+    if ( ! el || el.nodeName == 'BODY' || el.nodeName == 'HTML')
+      return null;
+    if ( hasClass(el,'pair') )
+      return el;
+    return findPair( el.parentElement );
+  }
+
+  function chooseMatch( e ) {
+    var pair = findPair( e.target );
+    if ( ! pair ) return;
+
+    var current = el('pair-'+roundIndex+'-'+matchIndex)
+    if ( current ) current.setAttribute('class','pair complete');
+    clearInterval(runInterval);
+    clearTimeout(matchTimeout);
+    runInterval = null;
+    matchTimeout = null;
+
+    var m = pair.id.match(/pair-(\d+)-(\d+)/)
+    roundIndex = parseInt(m[1]);
+    pairs = rounds[roundIndex-1];
+    matchIndex = parseInt(m[2]);
+    console.log("NEW CHOICE")
+    nextMatch();
+  }
+
   function simulationHandler( err, sim, gen ) {
     if ( err ) {
-      initializeTournament()
-      deathmatch.store.saveSimulation(simulation);
+      el('startup').style.display = 'block';
+      el('simulation').style.display = 'none';
       return
     }
 
+    console.log(sim,gen)
     simulation = sim;
     generation = gen;
-    population = generation.population;      
-    nextGeneration();      
+    population = generation.population; 
+
+    var by_index = {}
+    for (var i=0,creature; creature = population[i]; i++) by_index[creature.index] = creature;
+
+    rounds = [];
+    for (var i=0, roundSummary; roundSummary = generation.rounds[i]; i++ ) {
+      var round = [];
+      for (var j=0, matchSummary; matchSummary = roundSummary[j]; j++ ) {
+        var pair = [by_index[matchSummary.left.index], by_index[matchSummary.right.index]];
+        pair.floorSlope = matchSummary.floorSlope;
+        round.push( pair )
+      }
+      rounds.push( round );
+    }
+    console.log(rounds)
+
+    startTournament();      
   }
 
   function startSimulation() {
-    el('startup').style.display = 'none';
-    el('simulation').style.display = 'block';
 
     simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
+    generation = parseInt(el('generation_index').value);
 
-    if ( simulationName ) {
-      deathmatch.store.loadSimulation(simulationName, simulationHandler);
-    } else {
-      initializeTournament();
-      deathmatch.store.saveSimulation(simulation);
+    if ( simulationName && ! isNaN(generation) ) {
+      el('startup').style.display = 'none';
+      el('simulation').style.display = 'block';
+      deathmatch.store.loadGeneration(simulationName, generation, simulationHandler);
     }
 
     document.onkeypress = function(e) { 
@@ -368,14 +389,8 @@
 
   function init() {
     el('continue').onclick = startSimulation;
-    el('simulation_name').onkeypress = function(e) {
-      el('continue').innerHTML = el('simulation_name').value.match(/\S/) ? 'begin' : 'skip';
-      if (e.keyCode == 13) {
-        startSimulation()
-        return false;
-      }
-    }
     el('simulation_name').focus();
+    el('rounds').onclick = chooseMatch;
   }
 
   </script>
@@ -383,9 +398,19 @@
 <body onload="init()">
   <div id="startup">
     <div class="name">
-      <label>simulation name:</label>
-      <input type="text" id="simulation_name"/>
-      <button id="continue">skip</button>
+      <ul>
+        <li>
+          <label>simulation name:</label>
+          <input type="text" id="simulation_name"/>
+        </li>
+        <li>
+          <label>generation:</label>
+          <input type="text" id="generation_index"/>
+        </li>
+        <li>
+          <button id="continue">begin</button>
+        </li>
+      </ul>
     </div>
   </div>
   <div id="simulation">

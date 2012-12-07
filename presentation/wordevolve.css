@@ -1,0 +1,87 @@
+   #wordevolve {
+     position: relative;
+     margin: 0;
+     padding: 0;
+   }
+
+   #wordevolve input {
+      font-family: Andale Mono, Courier;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      background: transparent;
+      color: #fff;
+      border: none;
+      border-bottom: 1px dotted #eee;
+      outline: none;
+      display: block;
+      margin: 20px auto 0px;
+      text-align: center;
+      font-size: 15px;
+      width: 120px;
+    }
+
+    #wordevolve .starter {
+      -webkit-transition: opacity .2s linear;
+      -moz-transition: opacity .2s linear;
+      -ms-transition: opacity .2s linear;
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      height: 80px;
+      width: 10px;
+      margin-left: 580px;
+      opacity: 0;
+    }
+    #wordevolve .starter.ready {
+      opacity: 1;
+    }
+
+    #wordevolve .starter-thumb {
+      -webkit-transition: background-color .2s linear, top .2s ease;
+      -moz-transition: background-color .2s linear, top .2s ease;
+      -ms-transition: background-color .2s linear, top .2s ease;
+      border-radius: 50px;
+      width: 10px;
+      height: 10px;
+      left: 0;
+      position: absolute;
+      cursor: pointer;
+    }
+    #wordevolve .starter-thumb {
+      background-color: #cc6;
+      top: 0;
+    }
+    #wordevolve .starter-thumb.on {
+      background-color: #c66;
+      top:40px;
+    }
+
+    #wordevolve svg path {
+      fill: #666;
+    }
+
+    #wordevolve svg text.solution {
+      fill: #777;
+      font-size: 13px;
+      text-anchor: middle;
+      letter-spacing: .15em;
+    }
+
+    #wordevolve svg text.label {
+      fill: #666;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 0;
+    }
+
+    #wordevolve svg text .correct {
+      fill: #fff;
+    }
+
+    #wordevolve .solutions {
+      width: 1160px;
+      display: block;
+      margin: 0 auto 0;
+      padding:0;
+      height: 600px;
+    }

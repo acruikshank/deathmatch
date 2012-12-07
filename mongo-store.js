@@ -45,8 +45,38 @@ deathmatch.store = (function() {
     }
   }
 
+  function loadGeneration(name, generationIndex, handler /* err, simulation, generation */ ) {
+    var simulation, generation, complete = false;
+
+    request({url:'/simulations/'+encodeURIComponent(name), 
+      handler: function(o) { done( simulation = JSON.parse(o) ); },
+      errorHandler: errorHandler('simulation') });
+    request({url:'/generations/'+createKey(name, generationIndex), 
+      handler: function(o) { done( generation = JSON.parse(o) ); }, 
+      errorHandler: errorHandler("generation") });
+
+    function done() { 
+      if (simulation && generation) {
+        simulation.index = generation.index;
+        handler(null, simulation, generation);
+        complete = true;
+      }
+    }
+    function errorHandler(type) {
+      return function(status) { 
+        if ( ! complete )
+          handler(type+" not found");
+        complete = true;
+      }
+    }
+  }
+
+  function createKey( simulationName, generationIndex ) {
+    return encodeURIComponent(simulationName)+'-'+lpad(7,generationIndex)
+  }
+
   function saveGeneration( simulation, generation ) {
-    var key = encodeURIComponent(simulation.name)+'-'+lpad(7,simulation.index);
+    var key = createKey( simulation.name, simulation.index );
     generation.simulation = simulation.name;
     generation.index = simulation.index;
     request({
@@ -69,6 +99,7 @@ deathmatch.store = (function() {
 
   return {
     loadSimulation : loadSimulation,
+    loadGeneration : loadGeneration,
     saveSimulation : saveSimulation,
     saveGeneration : saveGeneration
   }

@@ -271,11 +271,11 @@ deathmatch.contest = (function() {
     return opponent2.score - opponent1.score;
   }
 
-  function startMatch( leftOrganism, rightOrganism, floorSlope ) {
+  function startMatch( leftOrganism, rightOrganism ) {
     var match = { leftOrganism:leftOrganism, rightOrganism:rightOrganism, junk:{} };
     var s = PIXELS_PER_METER;
     match.world = new b2World( new b2Vec2(0, 10),  false );
-    match.floorSlope = floorSlope || ((.5  + Math.random()) / 10);
+    match.floorSlope = (.5  + Math.random()) / 10;
 
     generateCage(match);
 

@@ -7,19 +7,21 @@
   <title>design</title>
   <meta name="author" content="sivoh">
   <style type="text/css">
-      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: #000; color:#fff;}
-      #player                 { display:block; float: left; margin-right: 20px; width:600px;  }
+      body                    { font-family:Helvetica,Arial,sans-serif; font-size:.83em; background-color: rgb(40,40,40); color:#eee;}
+      .design                 { width: 1020px; margin:20px auto;}
+      #player                 { display:block; float: left; margin-left: 20px; width:400px;  }
+      #player canvas          { border: 1px solid #444;}
       #controls               { padding: 10px 0 0 0; float: left; z-index:5; }
       #header                 { padding-left: 30px; }
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #types                  { clear:both; margin-top: 10px; width; 600px; padding:0; user-select:none; -webkit-user-select:none;  }
-      .type                   { height: 40px; margin:10px 0 15px; background:#282828; clear:both; width:600px; -webkit-border-radius:3px; }
+      .type                   { height: 40px; margin:10px 0 15px; background:#333; clear:both; width:600px; color:#ccc; -webkit-border-radius:3px; }
       .type .index            { display: inline-block; width:26px; font-size: 1.65em; line-height:40px; text-align: right; vertical-align:top;  }
       .choose                 { width:40px; display: inline-block; margin-left:4px; }
       .outer                  { width: 9px; height: 40px; margin: 0 15px; background:#000;
                                 border:solid #ccc; border-width: 0 1px; position: relative; cursor:ns-resize; }
-      .inner                  { width: 5px; margin: auto 2px 0; background:#dd5; position:absolute; bottom:0; }
-      .chd                    { display: inline-block; color:#777; vertical-align: top; line-height:40px; font-size: 1.2em; }
+      .inner                  { width: 5px; margin: auto 2px 0; background:#cc8; position:absolute; bottom:0; }
+      .chd                    { display: inline-block; color:#666; vertical-align: top; line-height:40px; font-size: 1.2em; }
       .chd .delete, .chd .add { color: #404040; }
       .chd-index              { color: #fff; margin: 0 5px; position:relative; }
       .chd-index .up          { color: #404040; font-size:.2em; position:absolute; top:-27px; left:0; }
@@ -28,8 +30,13 @@
       .add-type               { display: inline-block; width:26px; font-size: 1.65em; line-height:20px; text-align: right; vertical-align:top; color:#777; }
       .chd-index .up:hover, .chd-index .down:hover, .add:hover, .delete:hover, .delete-type:hover, .add-type:hover { color:#fff; cursor: pointer; }
       #trait                  { display:none; position: absolute; z-index:1; width: 80px; text-align: right; font-size:2.5em; 
-                                background:rgba(0,0,0,.6); border-radius:5px; border:1px solid rgba(255,255,255,.5); padding: 5px;; }
-      #drop:hover, #reset:hover, #flip:hover { cursor:pointer; color: #ff0; }
+                                background:rgba(0,0,0,.6); border-radius:2px; border:1px solid rgba(255,255,255,.5); padding: 5px;; }
+      #starter                { position: absolute; top: 20px; left: 50%; height: 55px; margin-left: 520px; } 
+      #starter-thumb          { -webkit-transition: background-color .2s linear, top .2s ease; border-radius: 50px; 
+                                width: 10px; height: 10px; left: 0; position: absolute; cursor: pointer; }
+      #starter-thumb.off      { background-color: #6c6; top: 0; } 
+      #starter-thumb.on       { background-color: #c66; top:20px; }
+
       #export { position: fixed; bottom: -300px; right:0; height: 320px; width:600px; -webkit-transition: bottom .5s ease;}
       #export label { position:absolute; display:block; right:10px; top:0; border-radius: 4px 4px 0 0; background-color:#333; 
                       height: 12px; padding: 4px 8px 4px 8px; cursor:pointer; }
@@ -46,25 +53,27 @@
   <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
 </head>
 <body onload="init()">
-<div id="player">
-  <canvas id="display" width="600" height="600"></canvas>
-  <span id="drop">&#x25bA; DROP</span>
-  <span id="reset">&#x25C6; RESET</span>
-  <span id="flip">RIGHT</span>
-</div>
-<div id="controls">
-  <div id="header">
-    <span>tak</span>
-    <span>giv</span>
-    <span>ang</span>
-    <span>ext</span>
-    <span>obl</span>
-    <span>flx</span>
-    <span>chd</span>
+<div class="design">
+  <div id="controls">
+    <div id="header">
+      <span>tak</span>
+      <span>giv</span>
+      <span>ang</span>
+      <span>ext</span>
+      <span>obl</span>
+      <span>flx</span>
+      <span>chd</span>
+    </div>
+    <div id="types"> </div>
   </div>
-  <div id="types"> </div>
+  <div id="player">
+    <canvas id="display" width="400" height="400"></canvas>
+    <div id="starter">
+      <div id="starter-thumb" class="off"></div>
+    </div>
+  </div>
+  <div id="trait">23%</div>
 </div>
-<div id="trait">23%</div>
 <div id="export"><label id="export-label">import / export</label><div><textarea id="genome"></textarea><button id="import">import</button></div></div>
   <script language="javascript">
      var   b2Vec2 = Box2D.Common.Math.b2Vec2
@@ -109,7 +118,7 @@
 
     function draw() {
       var ctx = el('display').getContext('2d');
-      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      ctx.fillStyle = 'rgba(40,40,40,.8)';
       if (! debug) ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
 
       ctx.save();
@@ -117,7 +126,7 @@
       ctx.strokeStyle = 'rgb(255,255,255)';
       ctx.lineWidth = PIXELS_PER_METER;
 
-      deathmatch.render.render( creature, ctx );
+      deathmatch.render.render( creature, null, ctx );
       ctx.restore();
     }
 
@@ -141,9 +150,9 @@
       var ctx = el("display").getContext("2d");
 
       //create ground
-      statbox( ctx.canvas.height, -20, 0, 0 );
-      statbox( ctx.canvas.height, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, ctx.canvas.height - 5 );
-      statbox( ctx.canvas.height, ctx.canvas.width, ctx.canvas.width + 20, 0 );
+      statbox( ctx.canvas.height, -20, -7, 0 );
+      statbox( ctx.canvas.height+20, -ctx.canvas.width / 2, 1.5 * ctx.canvas.width, ctx.canvas.height + 7 );
+      statbox( ctx.canvas.height, ctx.canvas.width + 7, ctx.canvas.width + 20, 0 );
 
       deathmatch.contest.addPhysics( creature, 1, world );
 
@@ -164,7 +173,10 @@
     function update() {
       var ctx = el('display').getContext('2d');
       ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
       clearInterval(runInterval);
+      el('starter-thumb').setAttribute('class','off')
+
       localStorage.genome = JSON.stringify(genome);
 
       var transform = new deathmatch.creature.T().translate( 
@@ -221,14 +233,15 @@
 
     function handle_click( event ) {
       handleNodes( event, {
-        'add':        function(node) { genome[data(node)].chd.push(0); },
+        'add':        function(node) { genome[data(node)].chd.push(genome[data(node)].chd.slice(-1)[0]); },
         'delete':     function(node) { var chd = genome[data(node)].chd; if (chd.length>3) chd.pop(); },
         'up':         function(node) { var cin=childOf(node,'chd-index'),gene=genome[data(cin,0)],ci=data(cin,1);
                         if (gene.chd[ci] < 9) gene.chd[ci]++; },
         'down':       function(node) { var cin=childOf(node,'chd-index'),gene=genome[data(cin,0)],ci=data(cin,1);
                         if (gene.chd[ci] > 0) gene.chd[ci]--; },
         'delete-type':function(node) { if (genome.length > 1) genome.splice(data(node),1) },
-        'add-type':   function(node) { genome.push({ obl:.5, giv:.5, ext:.5, tak:.5, ang:.5, flx:.5, chd:[0,0,0] }); }
+        'add-type':   function(node) { genome.push({ obl:.5, giv:.0, ext:.5, tak:.5, ang:.5, flx:.5, 
+                                                     chd:[genome.length+1,genome.length+1,genome.length+1] }); }
       } );
       function data(node,idx) { return parseInt(node.getAttribute('data').split(',')[idx||0]); }
     }
@@ -270,18 +283,27 @@
           document.body.style.cursor = null;
         }
       }
+    }
 
+    function togglePhysics() {
+      if ( el('starter-thumb').getAttribute('class') == 'off') {
+        addPhysics(creature); 
+        runInterval = setInterval(physicsUpdate, 1000/60);
+        el('starter-thumb').setAttribute('class','on')
+      } else {
+        update();
+      }
     }
 
     function init() {
       el('types').onclick = handle_click;
       el('types').onmousedown = handle_drag;
-      el('drop').onclick = function() { addPhysics(creature); runInterval = setInterval(physicsUpdate, 1000/60); }
-      el('reset').onclick = update;
+
+      el('starter-thumb').onclick = togglePhysics;
+
       el('export').style.bottom = '-300px'
       el('export-label').onclick = function() { el('export').style.bottom = parseInt(el('export').style.bottom) ? 0 : '-300px'; }
       el('import').onclick = import_genome;
-      el('flip').onclick = function() { console.log("flip"); leftFacing = !leftFacing; el('flip').innerHTML=(leftFacing ? 'LEFT' : 'RIGHT'); update(); }
       update();
   };
 

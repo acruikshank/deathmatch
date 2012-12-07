@@ -1,0 +1,415 @@
+<html>
+<head>
+  <title>Box2d Deathmatch Presentation</title>
+  <style>
+    body {
+      background-color: rgb(40,40,40);
+      margin: 0;
+      padding: 0;
+      font-family: Andale Mono, Courier;
+      color: #eee;
+      overflow: hidden;
+       -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+   }
+
+   .slide {
+     position: absolute;
+     top: 0;
+     color: #eee;
+     overflow: hidden;
+   }
+
+  .slide.transition, .sub-slide.transition {
+    -webkit-transition: left .4s ease;
+  }
+
+  .slide .head {
+    text-align: center;
+    font-size: 48px;
+    font-weight: normal;
+    margin: 60px 0 60px;
+  }
+
+  .slide.bulleted li {
+    font-size: 34px;
+    line-height: 90px;
+    width: 800px;
+    margin: 0 auto;
+  }
+
+  .slide.bulleted.narrow li {
+    width: 400px;
+  }
+
+  .slide img {
+    display: block;
+    height: 50%;
+    margin: 0 auto;
+  }
+
+  .slide label.caption {
+    display: block;
+    text-align: center;
+    font-size: 24px;
+    font-weight: normal;
+    margin-top: 40px;    
+  }
+
+  .slide .center {
+    text-align: center;
+    font-size: 60px;
+    font-weight: normal;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    margin-top: -30px;
+    line-height: 60px;
+    height: 60px;
+  }
+
+  .sub-slide {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+  }
+
+  .sub-slide h3 {
+    text-align: center;
+    font-size: 30px;
+    font-weight: normal;
+    margin: 60px 0 60px;
+    color: #ccc;    
+  }
+
+  .title-screen {
+    position: absolute;
+    right: 80px;
+    bottom: 80px;
+  }
+
+  .title-screen h1 {
+    font-size: 80px;
+    font-weight: normal;
+    text-align: right;
+    margin: 80px 0 70px;
+  }
+
+  h2.by_line {
+    letter-spacing: .1em;
+    font-size: 34px;
+    font-weight: normal;
+    margin: 0;
+    padding:0;
+    line-height: 80px;
+    text-align: right;
+  }
+  </style>
+  <link rel="stylesheet" type="text/css" href="wordevolve.css">
+  <link rel="stylesheet" type="text/css" href="chromoton.css">
+  <link rel="stylesheet" type="text/css" href="design.css">
+  <script type="text/javascript" src="Box2DWeb-2_1_a_3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="wordevolve.js" charset="utf-8"></script>
+  <script type="text/javascript" src="chromoton.js" charset="utf-8"></script>
+  <script type="text/javascript" src="design.js" charset="utf-8"></script>
+</head>
+<body>
+  <div class="slide">
+    <div class="title-screen">
+      <h1>Box2d Deathmatch</h1>
+      <h2 class="by_line">Alex Cruikshank</h2>
+      <h2 class="by_line">acruikshank@github</h2>
+      <h2 class="by_line">@sivoh</h2>
+    </div>
+  </div>
+  <div class="slide bulleted">
+    <h2 class="head">Genetic Algorithms</h2>
+    <ul class='hidden-points'>
+      <li>Coded instructions (genotype)</li>
+      <li>Realization of instructions (phenotype)</li>
+      <li>Fitness test</li>
+      <li>Reproduction with mutation</li>
+      <li>Repeat for next generation</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <div id="wordevolve" class="interactive">
+      <input class="target" maxlength="10" />
+      <svg class="solutions">
+        <defs>
+          <linearGradient id="SoftEdge" gradientTransform="rotate(90 0 0)">
+            <stop offset="5%" stop-color="rgb(40,40,40)" stop-opacity="1"/>
+            <stop offset="95%" stop-color="rgb(40,40,40)"  stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <rect class="solutions-top" fill="url(#SoftEdge)" x="0" y="0" width="1160" height="400"/>
+      </svg>
+      <div class="starter">
+        <div class="starter-thumb"></div>
+      </div>
+    </div>
+    <div class="sub-slide">
+      <h3>word finder</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>8,031,810,176</h3>
+    </div>
+  </div>
+
+  <div class="slide">
+    <div id="chromoton" class="interactive">
+      <canvas class="chromotons" width="480" height="480"></canvas>
+      <div class="starter">
+        <div class="starter-thumb"></div>
+      </div>
+      <div class="legend">
+        <label>target</label>
+        <div class="target-color"></div>
+      </div>
+    </div>
+    <div class="sub-slide">
+      <h3>chromoton</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>genes code pigments</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>sexual reproduction</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>speciation</h3>
+    </div>
+    <div class="sub-slide">
+    </div>
+  </div>
+
+  <div class="slide">
+    <h2 class="center">Inspirations</h2>
+  </div>
+
+  <div class="slide">
+    <h2 class="center">Karl Sims</h2>
+  </div>
+
+  <div class="slide">
+    <h2 class="head">Ryan North</h2>
+    <img src="boxcar2d.png"/>
+    <label class="caption">BoxCar2D</label>
+  </div>
+
+  <div class="slide">
+    <h2 class="center">Deathmatch</h2>
+  </div>
+
+  <div class="slide bulleted narrow">
+    <h2 class="head">Problems</h2>
+    <ul class='hidden-points'>
+      <li>Genome Design</li>
+      <li>Embryology</li>
+      <li>Tournament design</li>
+      <li>Physics integration</li>
+      <li>Damage assessment</li>
+      <li>Reproduction</li>
+    </ul>
+  </div>
+
+  <div class="slide bulleted">
+    <h2 class="head">Features</h2>
+    <ul class='hidden-points'>
+      <li>Modular creatures made of polygons</li>
+      <li>Recursive genes permit fractal shapes</li>
+      <li>Each creature belongs to a species</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <div id="design" class="interactive">
+      <div class="design">
+        <div class="controls">
+          <div class="header">
+            <span>tak</span>
+            <span>giv</span>
+            <span>ang</span>
+            <span>ext</span>
+            <span>obl</span>
+            <span>flx</span>
+            <span>chd</span>
+          </div>
+          <div class="types"> </div>
+        </div>
+        <div class="player">
+          <canvas class="display" width="400" height="400"></canvas>
+          <div class="starter">
+            <div class="starter-thumb"></div>
+          </div>
+        </div>
+        <div class="trait">0%</div>
+      </div>
+    </div>
+    <div class="sub-slide">
+      <h3>6 traits plus children</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>giv allocates mass to children</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>ang changes the angle</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>ext moves part closer or farther from center</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>obl stretches and squeazes</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>flx makes joint springy or controls speed</h3>
+    </div>
+  </div>
+
+  <div class="slide bulleted">
+    <h2 class="head">Future work</h2>
+    <ul class='hidden-points'>
+      <li>Parameter tuning</li>
+      <li>Data analysis</li>
+      <li>Online simultaneous simulation</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2 class="center">Thank You</h2>
+    <h2 class="by_line">Alex Cruikshank</h2>
+    <h2 class="by_line">acruikshank@github</h2>
+    <h2 class="by_line">@sivoh</h2>
+  </div>
+
+</body>
+<foot>
+  <script>
+    var slideIndex = 0;
+    var subSlideIndex = 0;
+    var subslides;
+
+    wordevolve.init()
+    chromoton.init()
+    design.init()
+
+    function removeClass(el, clss) {
+      var re = new RegExp("^"+clss+"$|^"+clss+"\\s+|\\s+"+clss+"$|\\s+"+clss+"(\\s+)");
+      el.setAttribute( "class", (el.getAttribute('class')||'').replace(re,"$1") )
+    }
+    function addClass(el, clss) {
+      removeClass(el,clss)
+      el.setAttribute( 'class', (el.getAttribute('class') || '') + ' ' + clss )
+    }
+    function hasClass(el, clss) {
+      return !!(el.getAttribute('class')||'').match(new RegExp("(\\s+|^)"+clss+"(\\s+|$)"));
+    }
+
+    if ( location.hash && location.hash.match(/#\d+$/) )
+      slideIndex = +location.hash.match(/#(\d+)$/)[1]
+
+    var slides = document.getElementsByClassName('slide');
+    arrangeSlides( slides, slideIndex, true )
+    subslides = slides[slideIndex].getElementsByClassName('sub-slide');
+    if ( ! subslides.length ) {
+      subslides = null;
+    } else {
+      subSlideIndex = 0;
+      arrangeSlides( subslides, 0 );
+    }
+
+    function arrangeSlides( slides, index, autoHeight ) {
+      for (var i=0, slide; slide = slides[i]; i++) {
+        slide.style.width = document.body.offsetWidth + 'px';
+        if ( autoHeight )
+          slide.style.height = document.body.offsetHeight + 'px';
+        if ( i > index )
+          slide.style.left = document.body.offsetWidth + 'px';
+        else if ( i < index )
+          slide.style.left = -slide.offsetWidth + 'px';
+        else 
+          slide.style.left = '0px';
+      }      
+    }
+
+    function transition( oldSlide, newSlide, direction, adjustHeight ) {
+      var windowWidth = document.body.offsetWidth;
+      removeClass( newSlide, 'transition' );
+      newSlide.style.width = document.body.offsetWidth + 'px';
+      if (adjustHeight)
+        newSlide.style.height = document.body.offsetHeight + 'px';
+      newSlide.style.left = direction * windowWidth + 'px';
+      addClass( newSlide, 'transition' );
+      addClass( oldSlide, 'transition' );
+      
+      setTimeout(function() { 
+        newSlide.style.left = '0px'; 
+        oldSlide.style.left = -direction * oldSlide.offsetWidth + 'px' 
+      }, 1);
+      return newSlide;
+    }
+
+    function transitionSlide( oldSlide, newSlide, direction ) {
+      var interactive = oldSlide.getElementsByClassName('interactive');
+      for (var i=0, el; el = interactive[i]; i++)
+        window[el.id].hide();
+
+      interactive = newSlide.getElementsByClassName('interactive');
+      for (var i=0, el; el = interactive[i]; i++)
+        window[el.id].show();
+
+      subslides = newSlide.getElementsByClassName('sub-slide');
+      if ( ! subslides.length ) {
+        subslides = null;
+      } else {
+        subSlideIndex = ~direction ? 0 : subslides.length - 1;
+        arrangeSlides( subslides, subSlideIndex );
+      }
+
+      return transition(oldSlide, newSlide, direction, true);
+    }
+
+    function next() {
+      if ( subslides && subSlideIndex < subslides.length - 1 )
+        return transition( subslides[subSlideIndex], subslides[++subSlideIndex], 1 );
+
+      if ( slideIndex >= slides.length - 1 )
+        return;
+
+      transitionSlide( slides[slideIndex], slides[++slideIndex], 1 );
+      location.hash = slideIndex;
+    }
+
+    function prev() {
+      if ( subslides && subSlideIndex > 0 )
+        return transition( subslides[subSlideIndex], subslides[--subSlideIndex], -1 );
+
+      if ( slideIndex < 1 )
+        return;
+      transitionSlide( slides[slideIndex], slides[--slideIndex], -1 );
+      location.hash = slideIndex;
+    }
+
+    document.body.onkeyup = function(e) {
+      if (e.keyCode == 39) {
+        next()
+        return false;
+      } else if (e.keyCode == 37) {
+        prev()
+        return false;
+      }
+    }
+
+
+  </script>
+</foot>
+</html>

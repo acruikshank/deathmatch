@@ -1,0 +1,51 @@
+    #design {
+      font-family:Helvetica,Arial,sans-serif; font-size:.83em; 
+      position: relative;
+      margin: 0;
+      padding: 0;
+    }
+
+    #design .design         { width: 1020px; margin:20px auto;}
+    #design .player         { display:block; float: left; margin-left: 20px; width:400px;  }
+    #design .player canvas  { border: 1px solid #444;}
+    #design .controls       { padding: 10px 0 0 0; float: left; z-index:5; }
+    #design .header         { padding-left: 30px; }
+    #design .header span    { display:inline-block; width: 40px; text-align: center; }
+    #design .types          { clear:both; margin-top: 10px; width; 600px; padding:0; user-select:none; 
+                              -webkit-user-select:none;  }
+    #design .type           { height: 40px; margin:10px 0 15px; background:#333; clear:both; width:600px;
+                              color:#ccc; -webkit-border-radius:3px; }
+    #design .type .index    { display: inline-block; width:26px; font-size: 1.65em; line-height:40px;
+                              text-align: right; vertical-align:top;  }
+    #design .choose         { width:40px; display: inline-block; margin-left:4px; }
+    #design .outer          { width: 9px; height: 40px; margin: 0 15px; background:#000; border:solid #ccc; 
+                              border-width: 0 1px; position: relative; cursor:ns-resize; }
+    #design .inner          { width: 5px; margin: auto 2px 0; background:#cc8; position:absolute; bottom:0; }
+    #design .chd            { display: inline-block; color:#666; vertical-align: top; line-height:40px; font-size: 1.2em; }
+    #design .chd .delete, .chd .add { color: #404040; }
+    #design .chd-index      { color: #fff; margin: 0 5px; position:relative; }
+    #design .chd-index .up  { color: #404040; font-size:.2em; position:absolute; top:-27px; left:0; }
+    #design .chd-index .down  { color: #404040; font-size:.2em; position:absolute; top:4px; left:0; }
+    #design .delete-type    { display: inline-block; float:right; font-size:1.2em; margin:5px 5px 0 0; color:#777; }
+    #design .add-type       { display: inline-block; width:26px; font-size: 1.65em; line-height:20px; 
+                              text-align: right; vertical-align:top; color:#777; }
+    #design .chd-index .up:hover, #design .chd-index .down:hover, #design .add:hover, #design .delete:hover, 
+    #design .delete-type:hover, #design .add-type:hover { color:#fff; cursor: pointer; }
+    #design .trait          { display:none; position: absolute; z-index:1; width: 80px; text-align: right; 
+                              font-size:2.5em; background:rgba(0,0,0,.6); border-radius:2px; 
+                              border:1px solid rgba(255,255,255,.5); padding: 5px;; }
+    #design .starter        { position: absolute; top: 0px; left: 50%; height: 55px; margin-left: 520px; } 
+    #design .starter-thumb  { -webkit-transition: background-color .2s linear, top .2s ease; border-radius: 50px; 
+                                width: 10px; height: 10px; left: 0; position: absolute; cursor: pointer; }
+    #design .starter-thumb  { background-color: #6c6; top: 0; } 
+    #design .starter-thumb.on  { background-color: #c66; top:20px; }
+
+    #design .export         { position: fixed; bottom: -300px; right:0; height: 320px; width:600px; 
+                              -webkit-transition: bottom .5s ease;}
+    #design .export label   { position:absolute; display:block; right:10px; top:0; border-radius: 4px 4px 0 0; 
+                              background-color:#333; height: 12px; padding: 4px 8px 4px 8px; cursor:pointer; }
+    #design .export div     { position:absolute; top:20px; right:0; width:600px; height:280px; padding: 10px; 
+                              background-color:#333; border:none; border-radius: 4px 0 0 0; }
+    #design .export textarea { width:580px; height:220px; padding: 10px; background-color:#222; 
+                              border:1px solid black; font-size:12px; color: #ccc; border-radius: 4px; }
+    #design .export button  { position: absolute; bottom: 10px; right: 10px; cursor:pointer; } 
