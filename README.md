@@ -1,4 +1,0 @@
-deathmatch
-==========
-
-evolutionary experiment

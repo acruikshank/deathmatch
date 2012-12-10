@@ -1,14 +1,14 @@
 deathmatch = (window.deathmatch || {});
 deathmatch.contest = (function() {
+  /* TODO:
+     Separate out physics related function (including damage) into deathmatch-physics
+     */
+
   var PIXELS_PER_METER = .01;
 
   var DAMAGE_FACTOR = 25;
   var JUNK_DAMAGE_FACTOR = 10;
-  var MINIMUM_MOTION = .1;
-  var TKO_ITERATIONS = 100;
-  var BOTH_IMMOBILE_ITERATIONS = 50;
-  var KO_BONUS = 25;
-  var DRAW_ITERATIONS = 500;
+  var MAXIMUM_PARTS = 50;
 
   var MAX_FLEX_TORQUE = .5, MIN_FLEX_TORQUE = 100;
   var MAX_DRIVER_SPEED = 10, MIN_DRIVER_SPEED = .5;
@@ -22,6 +22,17 @@ deathmatch.contest = (function() {
     CAGE_MARGIN : CAGE_MARGIN,
     CAGE_BOTTOM : CAGE_BOTTOM
   };
+
+  var DEFAULT_MATCH_PARAMETERS = {
+    ROUND_PRIZES : { 1:8, 2:4, 4:2, 8:1 },
+    TKO_ITERATIONS : 100,
+    MINIMUM_MOTION : .02,
+    BOTH_IMMOBILE_ITERATIONS : 50,
+    WIN_BONUS : 200,
+    KO_BONUS : 25,
+    DRAW_ITERATIONS : 500,
+    MIN_ORGANISM_BREED_WEIGHT : 50
+  }
 
   var fixture_index = 10;
 
@@ -82,21 +93,122 @@ deathmatch.contest = (function() {
     return sum;
   }
 
-  function nextGeneration( population ) {
-    var bySpecies = {}, next = [];
-    for ( var i=0,organism; organism=population[i]; i++)
-      (bySpecies[organism.species.id] = bySpecies[organism.species.id] || []).push(organism);
-
-    for ( var id in bySpecies ) {
-      var species = bySpecies[id], speciesNext = [], harem = Math.ceil(species.length / 2);
-      species.sort( compareOpponents );
-      for ( var i=0,a; (a = species[i]) && speciesNext.length < species.length; i++ ) {
-        for (var j=1,b; (b = species[j]) && j <= harem && speciesNext.length < species.length; j++ )
-          speciesNext.push( deathmatch.creature.breedOrganisms(a,b) );
-        harem = Math.ceil(harem/2);
-      }
-      next = next.concat(speciesNext);
+  /*
+    The breeding algorithm needs to strike a balance between inter and intra species competition.
+    If species are allocated an equal number of slots, an individual of a poorly performing species
+    need only score slightly higher than the rest of its species to ensure reproductive success.
+    If tournament success is the only determinant of reproductive success, poor performing species
+    will go extinct more often than this simulation can afford. This algorithm mixes the two.
+    For each match, if match has winner, breed it X times each with a different randomly chosen member
+    of the same species. X is the prize set per round.
+    Allocate (remaining slots / number of species) slots to each species so that exactly remiaining
+    slots are taken, but the slots allocated to any two species differs by no more than 1.
+    For each species, take the highest scoring organism and breed it ceil(species slots/2) times
+    with diferent randomly selected members of the same species, repeat the procedure with the second
+    highest scoring organism and so on until the slots are filled.
+    The number of members of a species going into the next generation cannot exceed half the population
+    size. The first section can just cut the prizes when the species is about to go over the limit. The
+    second algorithm is more complicated. Entering the second stage, so long as the remaining slots 
+    are > the number of species, there can be at most one species that would exceed the half population
+    limit by receiving an equal share of remaining slots. So to fix this problem, start by finding this
+    species (if it exists) giving it exactly as many slots as it can have, then removing it from the
+    pool. From there the equal distribution algorithm shouldn't cause a problem.
+   */
+  function randIndex(ar) { return (Math.random() * ar.length)|0; }
+  function randItem(ar) { return ar[randIndex(ar)]; }
+  function mapInc(m,k) { m[k] = (m[k]||0) + 1; }
+  function mapAdd(m,k,n) { m[k] = (m[k]||0) + n; }
+  function Chooser( objects ) {
+    var choices=[], weights=[0], totalWeight=0, chooser={};
+    var add = chooser.add = function( obj, weight ) {
+      choices.push(obj);
+      weights.push( totalWeight += weight );
+      return chooser;
     }
+    chooser.choose = function() {
+      if ( choices.length == 0 ) return null;
+      var choice = Math.random() * totalWeight, start=0, end=weights.length-1, next;
+      while ( end > start + 1 ) {
+        next=start+Math.floor((end - start)/2);
+        choice >= weights[next] ? start = next : end = next;
+      }
+      return choices[start];
+    }
+    if ( objects ) for (var key in objects) add( key, objects[key] );
+    return chooser;
+  }
+  function breedRandomly( organism, speciesChooser, rates ) {
+    var mate = speciesChooser.choose();
+    while ( mate === organism )
+      mate = speciesChooser.choose();
+    return deathmatch.creature.breedOrganisms( organism, mate, rates );
+  }
+  function nextSpeciesGeneration( species, slots, speciesChooser, rates ) {
+    var speciesNext = [], harem = Math.ceil(slots / 2);
+    species.sort( compareOpponents );
+
+    for ( var i=0,a; (a = species[i]) && speciesNext.length < slots; i++ ) {
+      for (var j=1; j <= harem && speciesNext.length < slots; j++ ) {
+        speciesNext.push( breedRandomly(a,speciesChooser,rates) );
+      }
+      harem = Math.ceil(harem/2);
+    } 
+    return speciesNext;
+  }
+  function nextGeneration( generationSummary, simulation ) {
+    var bySpecies = {}, byIndex=[], speciesCount={}, next=[], winner, speciesLimit = generationSummary.population.length/2;
+    var speciesChoosers = {};
+    for ( var i=0,organism; organism=generationSummary.population[i]; i++) {
+      var id = organism.species.id;
+      (bySpecies[id] = bySpecies[id] || []).push(organism);
+      speciesChoosers[id] = speciesChoosers[id] || Chooser();
+      speciesChoosers[id].add( organism, Math.max(organism.score, simulation.MIN_ORGANISM_BREED_WEIGHT) );
+      byIndex[organism.index] = organism;
+    }
+
+    // award slots for winning matches
+    for (var i=generationSummary.rounds.length-1,round; round = generationSummary.rounds[i]; i--) {
+      var prize = simulation.ROUND_PRIZES[round.length];
+      if ( prize ) for (var j=0,match; match = round[j]; j++) {
+        winner = ( match.left.winner && byIndex[match.left.index] )
+                 || ( match.right.winner && byIndex[match.right.index] );
+        if (winner) for (var k=0; k<prize && (speciesCount[winner.species.id]||0) < speciesLimit; k++) {
+          next.push( breedRandomly( winner, speciesChoosers[winner.species.id], simulation ) );
+          mapInc( speciesCount, winner.species.id );
+        }
+      }
+    }
+
+    // find species with most slots and number of species
+    var numberOfSpecies=0, biggestSpecies, remainingSlots = generationSummary.population.length - next.length;
+    for ( var id in bySpecies ) {
+      numberOfSpecies++;
+      if ( speciesCount[id] && ( ! biggestSpecies || speciesCount[biggestSpecies] < speciesCount[id] ) )
+        biggestSpecies = id;
+    }
+
+    // avoid adding too many slots for biggest species and remove it from the next calculation
+    if ( biggestSpecies && speciesCount[biggestSpecies] ) {
+      var slots = Math.min(speciesLimit - speciesCount[biggestSpecies], Math.ceil(remainingSlots/numberOfSpecies) );
+      next = next.concat( nextSpeciesGeneration(bySpecies[biggestSpecies], slots, speciesChoosers[biggestSpecies], simulation) )
+      numberOfSpecies--;
+      remainingSlots -= slots;
+      mapAdd(speciesCount, biggestSpecies, slots);
+      delete bySpecies[biggestSpecies];
+    }
+
+    // allocate slots roughly evenly to the rest of species.
+    for ( var id in bySpecies ) {
+      slots = Math.ceil(remainingSlots / numberOfSpecies);
+      next = next.concat( nextSpeciesGeneration(bySpecies[id], slots, speciesChoosers[id], simulation) )
+      numberOfSpecies--;
+      remainingSlots -= slots;
+      mapAdd( speciesCount, id, slots);
+    }
+
+    // assign an index to each organism
+    for (var i=0; i < next.length; i++) next[i].index = i;
+
     return next;
   }
 
@@ -111,31 +223,42 @@ deathmatch.contest = (function() {
     -   We keep a count for each species parent encountered. 
     -   If the count is = matchCount any organisms with that species parent will be skipped.
     - The first pair is created from the first organism in opponent list and the last compatible organism.
-    -   These are removed from the oppenent list.
+    -   These are removed from the opponent list.
     -   This process is repeated until all the organisms are matched.
    */
+  function parentSpeciesId( organism ) { return (organism.species.parent || organism.species).id }
+  function siblingSpecies( org1, org2 ) {  return parentSpeciesId(org1) == parentSpeciesId(org2); }
+  function lastCompatibleIndex( org, participants ) {
+    for (var i=participants.length-1, organism; organism=participants[i]; i--)
+      if ( ! siblingSpecies(org,organism) ) return i;
+    return -1;
+  }
   function pairOpponents( population, matchCount ) {
-    var speciesParent, speciesCount = {}, participants = [], pairs = [];
+    var speciesCount = {}, participants = [], pairs = [];
     for (var i=0,organism; participants.length < 2*matchCount && (organism=population[i]); i++) {
-      speciesParent = organism.species.parent || organism.species;
-      if ( (speciesCount[speciesParent.id]||0) + 1 <= matchCount ) {
+      if ( (speciesCount[parentSpeciesId(organism)]||0) + 1 <= matchCount ) {
         participants.push(organism);
-        speciesCount[speciesParent.id] = (speciesCount[speciesParent.id]||0) + 1;
+        speciesCount[parentSpeciesId(organism)] = (speciesCount[parentSpeciesId(organism)]||0) + 1;
       }
     }
 
-    while ( participants.length > 1 ) {
-      var pair = participants.splice(0,1), 
-          firstSpeciesParent = (pair[0].species.parent || pair[0].species).id;
-      for (var i=participants.length-1, organism; organism=participants[i]; i--) {
-        secondSpeciesParent = (organism.species.parent || organism.species).id;
-        if ( firstSpeciesParent != secondSpeciesParent ) {
-          pair.push( participants.splice(i,1)[0] );
-          break;
+    while ( participants.length > 0 ) {
+      var pair = participants.splice(0,1), other = lastCompatibleIndex(pair[0],participants);
+
+      if ( ~other ) {
+        pair.push( participants.splice(other,1)[0] );
+      } else {
+        // The last two are of sibling species. There must be at least one other
+        // match where neither of the participants are related to this one.
+        for ( var i=pairs.length-1, otherPair; otherPair = pairs[i]; i-- ) {
+          if ( ! siblingSpecies(pair[0],otherPair[0]) && ! siblingSpecies(pair[0],otherPair[1]) ) {
+            pair = otherPair.splice(1,1,pair[0]);
+            pair.push( participants.splice(0,1)[0] );
+            break;
+          }
         }
       }
-      if ( pair.length > 1 )
-        pairs.push(pair);
+      pairs.push(pair);
     }
 
     return pairs;
@@ -145,8 +268,6 @@ deathmatch.contest = (function() {
    used as a sorting function to rank organsims after a round of matches
    */
   function compareOpponents( opponent1, opponent2 ) {
-    if ( opponent1.wins != opponent2.wins )
-      return opponent2.wins - opponent1.wins;
     return opponent2.score - opponent1.score;
   }
 
@@ -182,67 +303,100 @@ deathmatch.contest = (function() {
 
     addContactListeners( match.world );
 
+    var leftParts = deathmatch.creature.parts(match.leftCreature);
+    var rightParts = deathmatch.creature.parts(match.rightCreature);
+    if ( leftParts > MAXIMUM_PARTS ) {
+      if ( rightParts > MAXIMUM_PARTS ) {
+        match.result = 'DOUBLE PARTS DQ';
+      } else {
+        match.rightCreature.wins++;
+        match.result = 'RIGHT BY PARTS DQ';
+      }
+    } else if ( rightParts > MAXIMUM_PARTS ) {
+      match.leftCreature.wins++;
+      match.result = 'LEFT BY PARTS DQ';      
+    }
+
     return match;
   }
 
-  function updateMatch( match ) {
+  function updateMatch( match, simulation ) {
     match.world.Step( 1 / 60 /* frame-rate */,  10 /* velocity iterations*/,  1 /* position iterations */);
 
-    updateCreature( match.leftCreature, match, match.leftStats );
-    updateCreature( match.rightCreature, match, match.rightStats );
+    updateCreature( match.leftCreature, match, match.leftStats, simulation );
+    updateCreature( match.rightCreature, match, match.rightStats, simulation );
     updateJunk( match );
 
     match.world.ClearForces();
 
     match.iterations++;
 
-    return assessMatch(match);
+    return assessMatch(match, simulation);
   }
 
-  function assessMatch( match ) {
-    if ( match.rightStats.health <= 0.0 ) {
-      match.result = "LEFT KO";
-      match.leftOrganism.wins++;
-      match.leftOrganism.score += score(match.leftStats,match.rightStats, true);
-      return false;
-    }
-    if ( match.leftStats.health <= 0.0 ) {
-      match.result = "RIGHT KO";
-      match.rightOrganism.wins++;
-      match.leftOrganism.score += score(match.rightStats,match.leftStats, true);
-      return false;
-    }
+  function assessMatch( match, simulation ) {
+    if ( match.rightStats.health <= 0.0 )
+      return updateMatchStats(match, "LEFT KO", true, false, simulation );
 
-    if ( match.rightStats.immobileIterations >= TKO_ITERATIONS ) {
-      match.result = "LEFT TKO";
-      match.leftOrganism.wins++;
-      return updateScores(match);
-    }
-    if ( match.leftStats.immobileIterations >= TKO_ITERATIONS ) {
-      match.result = "RIGHT TKO";
-      match.rightOrganism.wins++;
-      return updateScores(match);
-    }
-    if ( match.leftStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS 
-      && match.rightStats.immobileIterations >= BOTH_IMMOBILE_ITERATIONS ) {
-      match.result = "BOTH IMMOBILE";
-      return updateScores(match); 
-    }
-    if ( match.iterations >= DRAW_ITERATIONS ) {
-      var leftScore = score(match.leftStats,match.rightStats, false);
-      var rightScore = score(match.rightStats,match.leftStats, false);
-      if ( rightScore - leftScore > .00001 ) {
-        match.result = "RIGHT ON POINTS";
-        match.rightOrganism.wins++;
-      } else if ( leftScore - rightScore > .00001 ) {
-        match.result = "LEFT ON POINTS";
-        match.leftOrganism.wins++;
-      } else {
-        match.result = "DRAW";
-      }
-      return updateScores(match);
+    if ( match.leftStats.health <= 0.0 )
+      return updateMatchStats(match, "RIGHT KO", false, true, simulation );
+
+    if ( match.rightStats.immobileIterations >= simulation.TKO_ITERATIONS )
+      return updateMatchStats(match, "LEFT TKO", true, false, simulation );
+
+    if ( match.leftStats.immobileIterations >= simulation.TKO_ITERATIONS )
+      return updateMatchStats(match, "RIGHT TKO", false, true, simulation );
+
+    if ( match.leftStats.immobileIterations >= simulation.BOTH_IMMOBILE_ITERATIONS 
+       && match.rightStats.immobileIterations >= simulation.BOTH_IMMOBILE_ITERATIONS )
+      return updateMatchStats(match, "BOTH IMMOBILE", false, false, simulation );
+
+    if ( match.iterations >= simulation.DRAW_ITERATIONS ) {
+      var leftScore = score(match.leftStats,match.rightStats, false, simulation);
+      var rightScore = score(match.rightStats,match.leftStats, false, simulation);
+
+      if ( leftScore - rightScore > .00001 )
+        return updateMatchStats(match, "LEFT ON POINTS", true, false, simulation );
+
+      if ( rightScore - leftScore > .00001 )
+        return updateMatchStats(match, "RIGHT ON POINTS", false, true, simulation );
+
+      return updateMatchStats(match, "DRAW", false, false, simulation );
     }
     return true;    
+  }
+
+  function matchSummary(match) {
+    return {
+      floorSlope: match.floorSlope,
+      result: match.result,
+      iterations: match.iterations,
+      left: { 
+        index: match.leftOrganism.index,
+        winner: match.leftStats.winner,
+        health: match.leftStats.health
+      },
+      right: {
+        index: match.rightOrganism.index,
+        winner: match.rightStats.winner,
+        health: match.rightStats.health
+      }
+    }
+  }
+
+  function updateMatchStats( match, status, leftWinner, rightWinner, simulation ) {
+    match.result = status;
+    if (leftWinner) {
+      match.leftOrganism.wins++;
+      match.leftOrganism.score += simulation.WIN_BONUS;
+      match.leftStats.winner = true;
+    }
+    if (rightWinner) {
+      match.rightOrganism.wins++;
+      match.rightOrganism.score += simulation.WIN_BONUS;
+      match.rightStats.winner = true;      
+    }
+    return updateScores(match);
   }
 
   function updateScores(match) {
@@ -251,9 +405,9 @@ deathmatch.contest = (function() {
     return false;
   }
 
-  function score(organismStats, opponentStats, ko) {
-    var score = Math.max(organismStats.health - opponentStats.health, 0);
-    if (ko) score += KO_BONUS;
+  function score(organismStats, opponentStats, ko, simulation) {
+    var score = Math.max(100 - opponentStats.health, 0);
+    if (ko) score += simulation.KO_BONUS;
     return score;
   }
 
@@ -384,7 +538,7 @@ deathmatch.contest = (function() {
     return {joint:child.attachment, constant:constant, type:type}
   }
 
-  function updateCreature( creature, match, stats ) {
+  function updateCreature( creature, match, stats, simulation ) {
     updatePart(creature);
     for ( var i=0,joint; joint = creature.joints[i]; i++ ) {
       if ( joint.type === 'flex' ) {
@@ -394,8 +548,7 @@ deathmatch.contest = (function() {
     }
     if ( stats ) {
       stats.health = assessDamage( creature, match );
-      if ( Math.abs( creature.origin.x - stats.lastPosition.x ) > MINIMUM_MOTION ||
-           Math.abs( creature.origin.y - stats.lastPosition.y ) > MINIMUM_MOTION ) {
+      if ( Math.abs( creature.origin.x - stats.lastPosition.x ) > simulation.MINIMUM_MOTION ) {
         stats.immobileIterations = 0;
         stats.lastPosition = {x:creature.origin.x, y:creature.origin.y};
       } else {
@@ -414,8 +567,14 @@ deathmatch.contest = (function() {
 
   function assessDamage( part, match ) {
     var totalDamage = 0, health = part.health;
-    for ( var id in health.blows ) totalDamage += health.blows[id].damage
-    health.instant_integrity = health.integrity - blowDamage( totalDamage, part );
+    for ( var id in health.blows ) totalDamage += health.blows[id].damage;
+    var damage = blowDamage( totalDamage, part );
+    health.instant_integrity = health.integrity - damage;
+
+    if ( totalDamage > 0 ) {
+      part.last_hit_at = match.iterations;
+      part.last_hit = damage;
+    }
 
     if ( part.health.instant_integrity <= 0 ) {
       junkify( part, match );
@@ -430,6 +589,7 @@ deathmatch.contest = (function() {
     filterData.groupIndex = 0;
     part.body.m_fixtureList.SetFilterData(filterData);
     part.junk = true;
+    part.junked_at = match.iterations;
     match.junk[part.body.id] = part;
     part.health.integrity = 1;
 
@@ -524,14 +684,16 @@ deathmatch.contest = (function() {
 
   return {
     PIXELS_PER_METER : PIXELS_PER_METER,
+    DEFAULT_MATCH_PARAMETERS : DEFAULT_MATCH_PARAMETERS,
     cageParameters : cageParameters,
     startMatch : startMatch,
-    updateCreature: updateCreature,
+    updateCreature : updateCreature,
     updateMatch : updateMatch,
     addPhysics : addPhysics,
     nextGeneration : nextGeneration,
-    compareOpponents: compareOpponents,
-    pairOpponents: pairOpponents
+    compareOpponents : compareOpponents,
+    matchSummary : matchSummary,
+    pairOpponents : pairOpponents
   }
 })();
 

@@ -1,0 +1,66 @@
+    #chromoton {
+      position: relative;
+      margin: 0;
+      padding: 0;
+    }
+
+    #chromoton canvas {
+      display: block;
+      margin: 0 auto;
+      position: relative;
+      top: 20px;
+    }
+
+    #chromoton .starter {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      height: 55px;
+      margin-left: 245px;
+    }
+
+    #chromoton .starter-thumb {
+      -webkit-transition: background-color .2s linear, top .2s ease;
+      -moz-transition: background-color .2s linear, top .2s ease;
+      -ms-transition: background-color .2s linear, top .2s ease;
+      border-radius: 50px;
+      width: 10px;
+      height: 10px;
+      left: 0;
+      position: absolute;
+      cursor: pointer;
+    }
+    #chromoton .starter-thumb {
+      background-color: #6c6;
+      top: 0;
+    }
+    #chromoton .starter-thumb.on {
+      background-color: #c66;
+      top:20px;
+    }
+
+    #chromoton .legend {
+      position: absolute;
+      top: 445px;
+      left: 50%;
+      height: 55px;
+      margin-left: 200px;
+      font-size: 10px ;
+    }
+
+    #chromoton .legend label {
+      display: block;
+      margin: 0;
+      padding: 0;
+      width: 40px;
+      text-align: center;
+    }
+
+    #chromoton .target-color {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+    }
