@@ -30,7 +30,7 @@ wordevolve = (function() {
 
   var xEasing = yEasing = splinef(.2,.2,.8,.8);
   var Y_DISPLACEMENT = 150;
-  var STEP_MS = 400;
+  var STEP_MS = 300;
   var GEN_SIZE = 10;
   var scrolling, animationKey;
   var bestChild, generation, generationIndex, target;

@@ -9,13 +9,14 @@
       body { 
         font-family:Andale Mono,Helvetica,Arial,sans-serif; 
         font-size:.83em; 
-        background-color: #666; 
+        background-color: #555; 
         color:#ccc; 
         width:100%; 
         margin:0; 
       }
 
       #simulation { display: none; }
+
       #startup .name {
         width: 480px;
         margin: 100px auto 20px;
@@ -66,6 +67,36 @@
         box-shadow: 0 0 2px #000;
       }
 
+      .match {
+        position: relative;
+      }
+
+      #starter {
+        position: absolute;
+        top: 0px;
+        left: 50%;
+        height: 55px;
+        margin-left:400px;
+      }
+
+      #starter-thumb {
+        -webkit-transition: background-color .2s linear, top .2s ease;
+        -moz-transition: background-color .2s linear, top .2s ease;
+        -ms-transition: background-color .2s linear, top .2s ease;
+        border-radius: 50px;
+        width: 10px;
+        height: 10px;
+        left: 0;
+        position: absolute;
+        cursor: pointer;
+        background-color: #6c6;
+        top: 0;
+      }
+      #starter-thumb.on {
+        background-color: #c66;
+        top:20px;
+      }
+
       #header                 { padding-left: 30px; }
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
@@ -85,7 +116,8 @@
         color: #999; 
         font-weight: bold;
         text-shadow: 0 0 6px #444;
-        text-align: center;      
+        text-align: center;    
+        cursor:pointer;  
       }
       .pair { 
         display: inline-block; 
@@ -151,6 +183,18 @@
     out.el = function() { return el; };
     return out;
   }
+  function removeClass(el, clss) {
+    var re = new RegExp("^"+clss+"$|^"+clss+"\\s+|\\s+"+clss+"$|\\s+"+clss+"(\\s+)");
+    el.setAttribute( "class", (el.getAttribute('class')||'').replace(re,"$1") )
+  }
+  function addClass(el, clss) {
+    removeClass(el,clss)
+    el.setAttribute( 'class', (el.getAttribute('class') || '') + ' ' + clss )
+  }
+  function hasClass(el, clss) {
+    return !!(el.getAttribute('class')||'').match(new RegExp("(\\s+|^)"+clss+"(\\s+|$)"));
+  }
+
   function extend() {
     var o = {};
     for (var i=0,l=arguments.length; i<l; i++)
@@ -262,8 +306,9 @@
     } else if ( state == 'PRE_ROUND' ) {
       nextRound();
     } else if ( state == 'PRE_MATCH' ) {
-      nextMatch();
+      nextMatch();      
     }
+    addClass(el('starter-thumb'),'on')
   }
 
   function updateMatch() {
@@ -363,6 +408,20 @@
     startTournament();      
   }
 
+  function pauseSimulation() {
+    clearInterval(runInterval);
+    clearTimeout(matchTimeout);
+    runInterval = null;
+    matchTimeout = null;
+    removeClass(el('starter-thumb'),'on')
+  }
+
+  function startup() {
+    pauseSimulation();
+    el('startup').style.display = 'block';
+    el('simulation').style.display = 'none';
+  }
+
   function startSimulation() {
 
     simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
@@ -391,6 +450,13 @@
     el('continue').onclick = startSimulation;
     el('simulation_name').focus();
     el('rounds').onclick = chooseMatch;
+    el('starter-thumb').onclick = function() {
+      if ( hasClass(el('starter-thumb'),'on') )
+        pauseSimulation();
+      else
+        play();
+    }
+    el('generation').onclick = startup;
   }
 
   </script>
@@ -415,7 +481,12 @@
   </div>
   <div id="simulation">
     <h1 id="generation"></h1>
-    <canvas id="display" width="800" height="500"></canvas>
+    <div class='match'>
+      <canvas id="display" width="800" height="500"></canvas>
+      <div id="starter">
+        <div id="starter-thumb"></div>
+      </div>
+    </div>
     <div id="rounds"></div>
   </div>
 </body>
