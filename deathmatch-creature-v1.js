@@ -412,7 +412,6 @@ deathmatch.creature = (function() {
           start = Math.min(ti1,ti2), end = Math.max(ti1,ti2);
       statAdd(stats, 'recombined_traits', TRAITS.length);
 
-
       // handle traitshift mutation
       var donorShift = 0;
       if ( eventOccurance('TRAIT_SHIFT') ) {
@@ -452,9 +451,12 @@ deathmatch.creature = (function() {
       // apply additional mutations to chromosome and clone
       child.push( mutate(cloner) );
     }
-    for ( i=min; i < max; i++ ) {
-      child.push( mutate( parent1[i] || parent2[i] ) );
-      statAdd( stats, parent1[i] ? 'clone1' : 'clone2', 1);
+
+    if ( coinFlip() ) {
+      for ( i=min; i < max; i++ ) {
+        child.push( mutate( parent1[i] || parent2[i] ) );
+        statAdd( stats, parent1[i] ? 'clone1' : 'clone2', 1);
+      }
     }
 
     // apply chromosome duplication mutation
