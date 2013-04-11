@@ -36,7 +36,7 @@ deathmatch.creature = (function() {
     CHILD_DUPLICATION : .05,
     CHILD_DELETION : .05,
     CHROMOSOME_DUPLICATION : .4,
-    CHROMOSOME_DELETION : .6
+    CHROMOSOME_DELETION : .45
   }
 
   var ta = {};

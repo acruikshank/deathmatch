@@ -128,6 +128,18 @@ app.get('/latest-generation/:simulation', function( request, response, next ) {
   })
 })
 
+app.post('/generations/aggregate', function( request, response, next ) {
+  generations(function(err,collection) {
+    collection.aggregate(request.body, respond)
+
+    function respond( err, results ) {
+      if ( err )
+        next( err )
+      response.send(results);
+    }
+  })
+})
+
 app.get('/generations/:key', function( request, response, next ) {
   return find(generations, {key:request.params.key}, withResult);
   function withResult(err, generation) {

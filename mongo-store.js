@@ -14,8 +14,8 @@ deathmatch.store = (function() {
     };
     xhr.open(options.method || 'GET', options.url, true );
     if (options.headers) for (var k in options.headers) xhr.setRequestHeader(k, options.headers[k]);
-    if (("POST" === options.method) && (( ! options.headers ) || ( ! options.headers['Content-Type'] )))
-      xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+    if (("POST" === options.method) && (( ! options.headers ) || ( ! options.headers['Content-type'] )))
+      xhr.setRequestHeader('Content-type','application/x-www-form-urlencoded');
     xhr.send( options.body || null );
   }
 
@@ -71,6 +71,17 @@ deathmatch.store = (function() {
     }
   }
 
+  function aggregateGenerations( query, handler ) {
+    request({
+      url:'/generations/aggregate',
+      headers: {'Content-type':'application/json'},
+      method: 'POST',
+      body: JSON.stringify(query),
+      handler: function(response) { handler( JSON.parse(response) ) },
+      errorHandler: handler
+    })
+  }
+
   function createKey( simulationName, generationIndex ) {
     return encodeURIComponent(simulationName)+'-'+lpad(7,generationIndex)
   }
@@ -101,6 +112,7 @@ deathmatch.store = (function() {
     loadSimulation : loadSimulation,
     loadGeneration : loadGeneration,
     saveSimulation : saveSimulation,
-    saveGeneration : saveGeneration
+    saveGeneration : saveGeneration,
+    aggregateGenerations : aggregateGenerations,
   }
 })();
