@@ -61,7 +61,7 @@
     text-align: center;
     font-size: 24px;
     font-weight: normal;
-    margin-top: 40px;    
+    margin-top: 40px;
   }
 
   .slide .center {
@@ -88,7 +88,7 @@
     font-size: 30px;
     font-weight: normal;
     margin: 60px 0 60px;
-    color: #ccc;    
+    color: #ccc;
   }
 
   .title-screen {
@@ -184,12 +184,6 @@
       <h3>chromoton</h3>
     </div>
     <div class="sub-slide">
-      <h3>genes code pigments</h3>
-    </div>
-    <div class="sub-slide">
-      <h3>sexual reproduction</h3>
-    </div>
-    <div class="sub-slide">
       <h3>speciation</h3>
     </div>
     <div class="sub-slide">
@@ -197,7 +191,7 @@
   </div>
 
   <div class="slide">
-    <h2 class="center">Inspirations</h2>
+    <h2 class="center">Deathmatch 2D Inspirations</h2>
   </div>
 
   <div class="slide">
@@ -220,8 +214,8 @@
       <li>Gene Design</li>
       <li>Embryology</li>
       <li>Physics integration</li>
-      <li>Tournament design</li>
       <li>Damage assessment</li>
+      <li>Tournament design</li>
       <li>Reproduction</li>
     </ul>
   </div>
@@ -280,13 +274,8 @@
     </div>
   </div>
 
-  <div class="slide bulleted">
-    <h2 class="head">Future work</h2>
-    <ul class='hidden-points'>
-      <li>Parameter tuning</li>
-      <li>Data analysis</li>
-      <li>Online simultaneous simulation</li>
-    </ul>
+  <div class="slide">
+    <h2 class="center">Analysis</h2>
   </div>
 
   <div class="slide">
@@ -341,9 +330,9 @@
           slide.style.left = document.body.offsetWidth + 'px';
         else if ( i < index )
           slide.style.left = -slide.offsetWidth + 'px';
-        else 
+        else
           slide.style.left = '0px';
-      }      
+      }
     }
 
     function transition( oldSlide, newSlide, direction, adjustHeight ) {
@@ -355,10 +344,10 @@
       newSlide.style.left = direction * windowWidth + 'px';
       addClass( newSlide, 'transition' );
       addClass( oldSlide, 'transition' );
-      
-      setTimeout(function() { 
-        newSlide.style.left = '0px'; 
-        oldSlide.style.left = -direction * oldSlide.offsetWidth + 'px' 
+
+      setTimeout(function() {
+        newSlide.style.left = '0px';
+        oldSlide.style.left = -direction * oldSlide.offsetWidth + 'px'
       }, 1);
       return newSlide;
     }
