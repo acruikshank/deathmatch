@@ -6,13 +6,13 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Evolution Player</title>
   <style type="text/css">
-      body { 
-        font-family:Andale Mono,Helvetica,Arial,sans-serif; 
-        font-size:.83em; 
+      body {
+        font-family:Andale Mono,Helvetica,Arial,sans-serif;
+        font-size:.83em;
         background-color: rgb(40,40,40);
-        color:#ccc; 
-        width:100%; 
-        margin:0; 
+        color:#ccc;
+        width:100%;
+        margin:0;
       }
 
       #startup .name {
@@ -76,6 +76,7 @@
         top: 0;
         left: 0;
         width: 100%;
+        height: 100%;
       }
 
       .score {
@@ -284,7 +285,7 @@ function play() {
     currentGeneration = (currentGeneration+1) % generations.length;
     renderEvolution(currentGeneration);
     renderThumb();
-  }, 100)  
+  }, 100)
 }
 
 function renderCreature( ctx, genome ) {
@@ -295,13 +296,13 @@ function renderCreature( ctx, genome ) {
   var creature = deathmatch.creature.generate( genome, transform, true, s );
 
   deathmatch.render.renderToFit( creature, ctx );
-  ctx.restore();      
+  ctx.restore();
 }
 
 function renderThumb() {
-  el('progress-thumb').style.left = 
-    ((currentGeneration/generations.length) * 
-      (el('progress').offsetWidth - el('progress-thumb').offsetWidth)) 
+  el('progress-thumb').style.left =
+    ((currentGeneration/generations.length) *
+      (el('progress').offsetWidth - el('progress-thumb').offsetWidth))
     + 'px';
 }
 
@@ -320,7 +321,7 @@ function loadGenerations(simulation, start) {
     {$sort:{index:1, species:1}},
     {$group:{_id:'$index', organisms:{$push:'$organism'}, scores:{$push:'$score'}}},
     {$sort:{_id:1}}
-  ], function(response) { 
+  ], function(response) {
     if (!response || !response.length) return;
     for ( var i=0, r; r = response[i]; i++ ) generations.push(r);
     if (currentGeneration < 0)

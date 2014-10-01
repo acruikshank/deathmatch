@@ -6,13 +6,13 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Replay</title>
   <style type="text/css">
-      body { 
-        font-family:Andale Mono,Helvetica,Arial,sans-serif; 
-        font-size:.83em; 
-        background-color: #555; 
-        color:#ccc; 
-        width:100%; 
-        margin:0; 
+      body {
+        font-family:Andale Mono,Helvetica,Arial,sans-serif;
+        font-size:.83em;
+        background-color: #555;
+        color:#ccc;
+        width:100%;
+        margin:0;
       }
 
       #simulation { display: none; }
@@ -101,7 +101,7 @@
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
       #display                { display: block; width:800px; margin: 20px auto 0; }
-      .round { 
+      .round {
         clear:left; padding-left: 40px; width: 1024px; margin: 20px auto; position: relative;
         min-height: 75px; text-align: center;
       }
@@ -112,15 +112,15 @@
         width: 800px;
         padding:0;
         font-family: Andale Mono,Helvetica;
-        font-size:24px; 
-        color: #999; 
+        font-size:24px;
+        color: #999;
         font-weight: bold;
         text-shadow: 0 0 6px #444;
-        text-align: center;    
-        cursor:pointer;  
+        text-align: center;
+        cursor:pointer;
       }
-      .pair { 
-        display: inline-block; 
+      .pair {
+        display: inline-block;
         width: 88px;
         margin: 10px 10px 0;
         padding: 5px 0 5px 10px;
@@ -135,7 +135,7 @@
       }
       .pair.complete {
       }
-      .pair .organism { 
+      .pair .organism {
         display: inline-block; width: 34px; margin-right: 10px;
       }
       .pair canvas { width:34px; border: 1px solid #888; }
@@ -210,7 +210,7 @@
       population[i].wins = 0;
       population[i].score = 0;
     }
-    
+
     deathmatch.render.initSpeciesColors(population);
 
     roundIndex = 0;
@@ -283,8 +283,8 @@
     ctx.fillStyle = 'rgba(0,80,120,.2)';
     ctx.lineWidth = 20;
     ctx.strokeStyle = 'rgba(0,0,0,.8)';
-    deathmatch.render.renderToFit( creature, ctx );     
-    ctx.restore();      
+    deathmatch.render.renderToFit( creature, ctx );
+    ctx.restore();
   }
 
   function nextMatch() {
@@ -306,7 +306,7 @@
     } else if ( state == 'PRE_ROUND' ) {
       nextRound();
     } else if ( state == 'PRE_MATCH' ) {
-      nextMatch();      
+      nextMatch();
     }
     addClass(el('starter-thumb'),'on')
   }
@@ -326,7 +326,7 @@
 
   function matchComplete() {
     var ctx = el('display').getContext('2d');
-    
+
     if ( accelerated || ! match.iteration )
       deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor, true);
 
@@ -388,7 +388,7 @@
     console.log(sim,gen)
     simulation = sim;
     generation = gen;
-    population = generation.population; 
+    population = generation.population;
 
     var by_index = {}
     for (var i=0,creature; creature = population[i]; i++) by_index[creature.index] = creature;
@@ -405,7 +405,7 @@
     }
     console.log(rounds)
 
-    startTournament();      
+    startTournament();
   }
 
   function pauseSimulation() {
@@ -422,18 +422,20 @@
     el('simulation').style.display = 'none';
   }
 
-  function startSimulation() {
+  function startSimulation(e) {
+    if (e) e.preventDefault();
 
     simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
     generation = parseInt(el('generation_index').value);
 
     if ( simulationName && ! isNaN(generation) ) {
+      localStorage.simulationName = simulationName;
       el('startup').style.display = 'none';
       el('simulation').style.display = 'block';
       deathmatch.store.loadGeneration(simulationName, generation, simulationHandler);
     }
 
-    document.onkeypress = function(e) { 
+    document.onkeypress = function(e) {
       if (e.keyCode == 32) {
         accelerated = !accelerated;
         clearInterval(runInterval);
@@ -447,8 +449,14 @@
   }
 
   function init() {
+    el('replay').onsubmit = startSimulation;
     el('continue').onclick = startSimulation;
-    el('simulation_name').focus();
+    var simulationName = localStorage.simulationName || '';
+    el('simulation_name').value = simulationName;
+    if (simulationName)
+      el('generation_index').focus();
+    else
+      el('simulation_name').focus();
     el('rounds').onclick = chooseMatch;
     el('starter-thumb').onclick = function() {
       if ( hasClass(el('starter-thumb'),'on') )
@@ -464,6 +472,7 @@
 <body onload="init()">
   <div id="startup">
     <div class="name">
+      <form id="replay">
       <ul>
         <li>
           <label>simulation name:</label>
@@ -477,6 +486,7 @@
           <button id="continue">begin</button>
         </li>
       </ul>
+    </form>
     </div>
   </div>
   <div id="simulation">
