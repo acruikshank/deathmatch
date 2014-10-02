@@ -1,0 +1,397 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Evolve</title>
+  <style type="text/css">
+      body {
+        font-family:Andale Mono,Helvetica,Arial,sans-serif;
+        font-size:.83em;
+        background-color: #666;
+        color:#ccc;
+        width:100%;
+        margin:0;
+      }
+
+      #simulation { display: none; }
+      #startup .name {
+        width: 480px;
+        margin: 100px auto 20px;
+        font-family: Andale Mono,Helvetica,Arial,serif;
+        font-size: 18px;
+        color: #ccc;
+        font-weight: bold;
+        text-shadow: 0 0 4px #444;
+      }
+      #simulation_name {
+        border: none;
+        padding: 4px 6px;
+        width: 180px;
+        border-radius: 3px;
+        font-family: Andale Mono,Helvetica,Arial,sans-serif;
+        color: #666;
+        vertical-align: middle;
+        box-shadow: 0 0 4px #999;
+      }
+      #continue {
+        -webkit-appearance: none;
+        border: none;
+        border-radius: 4px;
+        padding: 3px 8px;
+        background: white;
+        box-shadow: 1px 1px 2px #999;
+        font-family: Andale Mono,Helvetica,Arial,sans-serif;
+        font-size: 13px;
+        color: #777;
+        cursor: pointer;
+      }
+      #continue:hover {
+        box-shadow: 1px 1px 2px #000;
+      }
+      #continue:active {
+        box-shadow: 0 0 2px #000;
+      }
+
+      #header                 { padding-left: 30px; }
+      #header span            { display:inline-block; width: 40px; text-align: center; }
+      #drop:hover             { cursor:pointer; }
+      #display                { display: block; width:800px; margin: 20px auto 0; }
+      .round {
+        clear:left; padding-left: 40px; width: 1024px; margin: 20px auto; position: relative;
+        min-height: 75px; text-align: center;
+      }
+      #generation {
+        display: block;
+        margin: 15px auto 0;
+        padding: 0;
+        width: 800px;
+        padding:0;
+        font-family: Andale Mono,Helvetica;
+        font-size:24px;
+        color: #999;
+        font-weight: bold;
+        text-shadow: 0 0 6px #444;
+        text-align: center;
+      }
+      .pair {
+        display: inline-block;
+        width: 88px;
+        margin: 10px 10px 0;
+        padding: 5px 0 5px 10px;
+        border: 1px solid transparent;
+      }
+      .pair.active {
+        background: rgba(255,255,0,.25);
+        border: 1px solid rgba(255,255,0,.333);
+      }
+      .pair.complete {
+        opacity: .25;
+      }
+      .pair .organism {
+        display: inline-block; width: 34px; margin-right: 10px;
+      }
+      .pair canvas { width:34px; border: 1px solid #888; }
+      .round-index { font-family: Andale Mono,Helvetica; font-size:40px; color: #999; font-weight: bold;
+                     text-shadow: 0 0 4px #444; position: absolute; left: 0; top: 10px; }
+
+      .round5 .pair { width:172px;  margin-left: 20px; }
+      .round5 .organism { width:68px; }
+      .round5 canvas { width:68px; }
+
+      .round6 .pair { width:220px;  margin-left: 40px; }
+      .round6 .organism { width:100px; }
+      .round6 canvas { width:100px; }
+
+      .round7 .pair { width:220px;  margin-left: 40px; }
+      .round7 .organism { width:100px; }
+      .round7 canvas { width:100px; }
+
+  </style>
+  <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="mongo-store.js" charset="utf-8"></script>
+  <script language="javascript">
+
+  var POPULATION_DEFAULTS = {
+    POPULATION_SIZE : 128,
+    SPECIES_SIZE : 22
+  }
+  var match, pairs, runInterval, roundSize, population, roundIndex, matchIndex;
+  var matchTimeout, simulation, generation, round, simulationName;
+  var accelerated = false;
+  var state = 'PRE_TOURNAMENT';
+
+  function el(id) { return document.getElementById(id); }
+  function gen( name, clss, atts ) {
+    var el = document.createElement(name), out={};
+    if ( typeof clss == 'object' ) atts=clss, clss=null;
+    for (var att in atts) el.setAttribute(att,atts[att]);
+    if ( clss ) el.setAttribute('class', clss);
+    out.add = function(node) { return el.appendChild( node.el ? node.el() : node ), out; };
+    out.text = function(txt) { return el.appendChild( document.createTextNode(txt) ), out };
+    out.el = function() { return el; };
+    return out;
+  }
+  function extend() {
+    var o = {};
+    for (var i=0,l=arguments.length; i<l; i++)
+      for ( var key in arguments[i] )
+        o[key] = arguments[i][key];
+    return o;
+  }
+
+  function shuffle(ar) {
+    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; }
+  }
+
+  function initializeTournament() {
+    simulation = extend( {name:simulationName, index:1},
+      deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
+
+    population = [];
+    while ( population.length < simulation.POPULATION_SIZE ) {
+      var size = Math.min(simulation.SPECIES_SIZE, simulation.POPULATION_SIZE-population.length)
+      population = population.concat( deathmatch.creature.newSpecies( size, simulation ) );
+    }
+    for ( var i=0, organism; organism = population[i]; i++ )
+      organism.index = i;
+    startTournament();
+  }
+
+  function startTournament() {
+    generation = {population:population, rounds:[]}
+    round = [];
+
+    // initialize stats
+    for ( var i=0, l=population.length; i<l; i++ ) {
+      population[i].wins = 0;
+      population[i].score = 0;
+    }
+
+    shuffle( population );
+    roundSize = simulation.POPULATION_SIZE/2;
+    pairs = deathmatch.contest.pairOpponents( population, roundSize );
+
+    deathmatch.render.initSpeciesColors(population);
+
+    roundIndex = 1;
+    matchIndex = 0;
+    var header = 'generation ' + simulation.index;
+    if (simulation) header = (simulation.name ? simulation.name + ' - ' : '') + header;
+    el('generation').innerHTML = header;
+    el('rounds').innerHTML = '';
+    renderRound( roundIndex, pairs );
+    nextMatch();
+  }
+
+  function nextGeneration() {
+    population = deathmatch.contest.nextGeneration(generation, simulation);
+    simulation.index++;
+    startTournament();
+  }
+
+  function nextRound() {
+    round = [];
+
+    if ( roundSize < 2 ) {
+      if ( simulationName && simulationName.length )
+        deathmatch.store.saveGeneration( simulation, generation)
+
+      return nextGeneration();
+    }
+
+    roundSize /= 2;
+
+    population.sort( deathmatch.contest.compareOpponents );
+    pairs = deathmatch.contest.pairOpponents( population, roundSize );
+
+    roundIndex++;
+    matchIndex = 0;
+    renderRound( roundIndex, pairs );
+
+    nextMatch();
+  }
+
+  function renderRound( roundIndex, pairs ) {
+    var rounds = el('rounds');
+    var round = gen('div', 'round round'+roundIndex).add(gen('span','round-index').text(roundIndex));
+    for ( var i=0,pair; pair = pairs[i]; i++ )
+      round.add( gen('div', 'pair', {id:'pair-'+roundIndex+'-'+i} ).add(
+        gen('div','organism',{id:'org-'+roundIndex+'-'+i+'-0'})
+          .add( gen('canvas', {id:'cvs-'+roundIndex+'-'+i+'-0', width:200, height:200 }))
+          .add( gen('div','stats', {id:'stats-'+roundIndex+'-'+i+'-0'}) )
+      ).add(
+        gen('div','organism',{id:'org-'+roundIndex+'-'+i+'-1'})
+          .add( gen('canvas', {id:'cvs-'+roundIndex+'-'+i+'-1', width:200, height:200 }))
+          .add( gen('div','stats', {id:'stats-'+roundIndex+'-'+i+'-1'}) )
+      ) );
+
+
+    if ( rounds.firstChild )
+      rounds.insertBefore( round.el(), rounds.firstChild );
+    else
+      rounds.appendChild( round.el() );
+
+    for ( var i=0,pair; pair = pairs[i]; i++ ) {
+      var cvs = el('cvs-'+roundIndex+'-'+i+'-0');
+      cvs.setAttribute('height', cvs.offsetHeight * 2);
+      cvs.setAttribute('width', cvs.offsetWidth * 2);
+      cvs.getContext('2d').fillStyle = 'rgb(40,40,40)';
+      cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
+      renderCreature(cvs.getContext('2d'), pair[0].genome )
+      cvs = el('cvs-'+roundIndex+'-'+i+'-1');
+      cvs.setAttribute('height', cvs.offsetHeight * 2);
+      cvs.setAttribute('width', cvs.offsetWidth * 2);
+      cvs.getContext('2d').fillStyle = 'rgb(40,40,40)';
+      cvs.getContext('2d').fillRect(0,0,cvs.width,cvs.height);
+      renderCreature(cvs.getContext('2d'), pair[1].genome )
+    }
+
+  }
+
+  function renderCreature( ctx, genome ) {
+    var s = deathmatch.contest.PIXELS_PER_METER;
+    var transform = new deathmatch.creature.T().translate( ctx.canvas.width*s/2, ctx.canvas.width*s/2 );
+    var creature = deathmatch.creature.generate( genome, transform, true, s );
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,80,120,.2)';
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    deathmatch.render.renderToFit( creature, ctx );
+    ctx.restore();
+  }
+
+  function nextMatch() {
+    el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair active');
+    var pair = pairs.splice(0,1)[0];
+    match = deathmatch.contest.startMatch( pair[0], pair[1] );
+    if ( match.result ) // immediate disqualification
+      return matchComplete();
+
+    state = 'IN_MATCH';
+    play();
+  }
+
+  function play() {
+    if ( state == 'IN_MATCH' ) {
+      runInterval = setInterval(function(){
+        updateMatch();
+      }, accelerated ? 1 : 1000/60 );
+    } else if ( state == 'PRE_ROUND' ) {
+      nextRound();
+    } else if ( state == 'PRE_MATCH' ) {
+      nextMatch();
+    }
+  }
+
+  function updateMatch() {
+    if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
+      clearInterval(runInterval);
+      runInterval = null;
+      return matchComplete();
+    }
+
+    if ( ! accelerated ) {
+      var ctx = el('display').getContext('2d');
+      deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor);
+    }
+  }
+
+  function matchComplete() {
+    round.push( deathmatch.contest.matchSummary(match) );
+
+    var ctx = el('display').getContext('2d');
+
+    if ( accelerated || ! match.iteration )
+      deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor, true);
+
+    el('pair-'+roundIndex+'-'+matchIndex).setAttribute('class','pair complete');
+    var ctx = el('display').getContext('2d');
+    ctx.font = 'bold 35px Andale Mono,Helvetica';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.fillText(match.result, 400, 80);
+    if ( ! pairs.length ) {
+      generation.rounds.push(round);
+      state = 'PRE_ROUND';
+      return matchTimeout = setTimeout( nextRound, accelerated ? 1 : 1000 );
+    }
+
+    matchIndex++;
+    state = 'PRE_MATCH';
+    matchTimeout = setTimeout( nextMatch, accelerated ? 1 : 1000 );
+  }
+
+  function simulationHandler( err, sim, gen ) {
+    if ( err ) {
+      initializeTournament()
+      deathmatch.store.saveSimulation(simulation);
+      return
+    }
+
+    simulation = sim;
+    generation = gen;
+    population = generation.population;
+    nextGeneration();
+  }
+
+  function startSimulation() {
+    el('startup').style.display = 'none';
+    el('simulation').style.display = 'block';
+
+    simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
+
+    if ( simulationName ) {
+      deathmatch.store.loadSimulation(simulationName, simulationHandler);
+    } else {
+      initializeTournament();
+      deathmatch.store.saveSimulation(simulation);
+    }
+
+    document.onkeypress = function(e) {
+      if (e.keyCode == 32) {
+        accelerated = !accelerated;
+        clearInterval(runInterval);
+        clearTimeout(matchTimeout);
+        runInterval = null;
+        matchTimeout = null;
+        play();
+        return false;
+      }
+    }
+  }
+
+  function init() {
+    el('continue').onclick = startSimulation;
+    el('simulation_name').onkeypress = function(e) {
+      el('continue').innerHTML = el('simulation_name').value.match(/\S/) ? 'begin' : 'skip';
+      if (e.keyCode == 13) {
+        startSimulation()
+        return false;
+      }
+    }
+    el('simulation_name').focus();
+  }
+
+  </script>
+</head>
+<body onload="init()">
+  <div id="startup">
+    <div class="name">
+      <label>simulation name:</label>
+      <input type="text" id="simulation_name"/>
+      <button id="continue">skip</button>
+    </div>
+  </div>
+  <div id="simulation">
+    <h1 id="generation"></h1>
+    <canvas id="display" width="800" height="500"></canvas>
+    <div id="rounds"></div>
+  </div>
+</body>
+</html>
