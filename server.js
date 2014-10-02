@@ -21,7 +21,7 @@ function guard(onError, onSuccess) {
 
 function connect(onConnect) {
   if (!connection)
-    connection = new mongodb.Db('deathmatch', new mongodb.Server("127.0.0.1",27017, { auto_reconnect : true }), {safe:false});
+    connection = new mongodb.Db('new_deathmatch', new mongodb.Server("127.0.0.1",27017, { auto_reconnect : true }), {safe:false});
 
   if (db) return onConnect(null,db);
 
@@ -110,7 +110,7 @@ app.get('/latest-generation/:simulation', function( request, response, next ) {
       {$project:{simulation:1,index:1}},
       {$match:{simulation:request.params.simulation}},
       {$sort:{index:-1}},
-      {$limit:1}], 
+      {$limit:1}],
       fetchById)
 
     function fetchById( err, result ) {
