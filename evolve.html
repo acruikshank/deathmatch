@@ -6,13 +6,13 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Evolve</title>
   <style type="text/css">
-      body { 
-        font-family:Andale Mono,Helvetica,Arial,sans-serif; 
-        font-size:.83em; 
-        background-color: #666; 
-        color:#ccc; 
-        width:100%; 
-        margin:0; 
+      body {
+        font-family:Andale Mono,Helvetica,Arial,sans-serif;
+        font-size:.83em;
+        background-color: #666;
+        color:#ccc;
+        width:100%;
+        margin:0;
       }
 
       #simulation { display: none; }
@@ -58,7 +58,7 @@
       #header span            { display:inline-block; width: 40px; text-align: center; }
       #drop:hover             { cursor:pointer; }
       #display                { display: block; width:800px; margin: 20px auto 0; }
-      .round { 
+      .round {
         clear:left; padding-left: 40px; width: 1024px; margin: 20px auto; position: relative;
         min-height: 75px; text-align: center;
       }
@@ -69,14 +69,14 @@
         width: 800px;
         padding:0;
         font-family: Andale Mono,Helvetica;
-        font-size:24px; 
-        color: #999; 
+        font-size:24px;
+        color: #999;
         font-weight: bold;
         text-shadow: 0 0 6px #444;
-        text-align: center;      
+        text-align: center;
       }
-      .pair { 
-        display: inline-block; 
+      .pair {
+        display: inline-block;
         width: 88px;
         margin: 10px 10px 0;
         padding: 5px 0 5px 10px;
@@ -89,7 +89,7 @@
       .pair.complete {
         opacity: .25;
       }
-      .pair .organism { 
+      .pair .organism {
         display: inline-block; width: 34px; margin-right: 10px;
       }
       .pair canvas { width:34px; border: 1px solid #888; }
@@ -145,11 +145,11 @@
   }
 
   function shuffle(ar) {
-    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; } 
+    for (var i=0, l=ar.length,t,dx; i<l; i++) { dx=(Math.random()*l)|0; t=ar[dx]; ar[dx]=ar[i]; ar[i]=t; }
   }
 
   function initializeTournament() {
-    simulation = extend( {name:simulationName, index:1}, 
+    simulation = extend( {name:simulationName, index:1},
       deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
 
     population = [];
@@ -171,7 +171,7 @@
       population[i].wins = 0;
       population[i].score = 0;
     }
-    
+
     shuffle( population );
     roundSize = simulation.POPULATION_SIZE/2;
     pairs = deathmatch.contest.pairOpponents( population, roundSize );
@@ -181,7 +181,7 @@
     roundIndex = 1;
     matchIndex = 0;
     var header = 'generation ' + simulation.index;
-    if (simulation) header = simulation.name + ' - ' + header;
+    if (simulation) header = (simulation.name ? simulation.name + ' - ' : '') + header;
     el('generation').innerHTML = header;
     el('rounds').innerHTML = '';
     renderRound( roundIndex, pairs );
@@ -262,8 +262,8 @@
     ctx.fillStyle = 'rgba(0,80,120,.2)';
     ctx.lineWidth = 20;
     ctx.strokeStyle = 'rgba(0,0,0,.8)';
-    deathmatch.render.renderToFit( creature, ctx );     
-    ctx.restore();      
+    deathmatch.render.renderToFit( creature, ctx );
+    ctx.restore();
   }
 
   function nextMatch() {
@@ -306,7 +306,7 @@
     round.push( deathmatch.contest.matchSummary(match) );
 
     var ctx = el('display').getContext('2d');
-    
+
     if ( accelerated || ! match.iteration )
       deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor, true);
 
@@ -336,8 +336,8 @@
 
     simulation = sim;
     generation = gen;
-    population = generation.population;      
-    nextGeneration();      
+    population = generation.population;
+    nextGeneration();
   }
 
   function startSimulation() {
@@ -353,7 +353,7 @@
       deathmatch.store.saveSimulation(simulation);
     }
 
-    document.onkeypress = function(e) { 
+    document.onkeypress = function(e) {
       if (e.keyCode == 32) {
         accelerated = !accelerated;
         clearInterval(runInterval);
