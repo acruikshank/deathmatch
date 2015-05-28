@@ -346,13 +346,6 @@
 
     simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
 
-    if ( simulationName ) {
-      deathmatch.store.loadSimulation(simulationName, simulationHandler);
-    } else {
-      initializeTournament();
-      deathmatch.store.saveSimulation(simulation);
-    }
-
     document.onkeypress = function(e) {
       if (e.keyCode == 32) {
         accelerated = !accelerated;
@@ -363,6 +356,13 @@
         play();
         return false;
       }
+    }
+
+    if ( simulationName ) {
+      deathmatch.store.loadSimulation(simulationName, simulationHandler);
+    } else {
+      initializeTournament();
+      deathmatch.store.saveSimulation(simulation);
     }
   }
 
