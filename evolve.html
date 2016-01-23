@@ -109,6 +109,7 @@
       .round7 canvas { width:100px; }
 
   </style>
+  <script src="HackTimer.min.js"></script>
   <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
@@ -346,13 +347,6 @@
 
     simulationName = el('simulation_name').value.match(/^\s*(.*?)\s*$/)[1];
 
-    if ( simulationName ) {
-      deathmatch.store.loadSimulation(simulationName, simulationHandler);
-    } else {
-      initializeTournament();
-      deathmatch.store.saveSimulation(simulation);
-    }
-
     document.onkeypress = function(e) {
       if (e.keyCode == 32) {
         accelerated = !accelerated;
@@ -364,9 +358,18 @@
         return false;
       }
     }
+
+    if ( simulationName ) {
+      deathmatch.store.loadSimulation(simulationName, simulationHandler);
+    } else {
+      initializeTournament();
+      deathmatch.store.saveSimulation(simulation);
+    }
   }
 
   function init() {
+    var ctx = el('display').getContext('2d');
+    ctx.scale(2,2);
     el('continue').onclick = startSimulation;
     el('simulation_name').onkeypress = function(e) {
       el('continue').innerHTML = el('simulation_name').value.match(/\S/) ? 'begin' : 'skip';
@@ -390,7 +393,7 @@
   </div>
   <div id="simulation">
     <h1 id="generation"></h1>
-    <canvas id="display" width="800" height="500"></canvas>
+    <canvas id="display" width="1600" height="1000"></canvas>
     <div id="rounds"></div>
   </div>
 </body>
