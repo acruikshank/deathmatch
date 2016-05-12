@@ -1,4 +1,4 @@
-deathmatch = (window.deathmatch || {});
+deathmatch = (this.deathmatch || {});
 deathmatch.contest = (function() {
   /* TODO:
      Separate out physics related function (including damage) into deathmatch-physics
@@ -80,14 +80,14 @@ deathmatch.contest = (function() {
   function abs_dot( v1, v2 ) { return Math.abs(v1.x * v2.x + v1.y * v2.y); }
 
   function eachChild( part, f, arg1, arg2 ) {
-    if (part.children) 
+    if (part.children)
       for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
         if (child) f( child, arg1, arg2 );
   }
 
   function sumChild( part, f, arg1, arg2 ) {
     var sum = 0;
-    if (part.children) 
+    if (part.children)
       for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
         if (child) sum += f( child, arg1, arg2 );
     return sum;
@@ -108,7 +108,7 @@ deathmatch.contest = (function() {
     highest scoring organism and so on until the slots are filled.
     The number of members of a species going into the next generation cannot exceed half the population
     size. The first section can just cut the prizes when the species is about to go over the limit. The
-    second algorithm is more complicated. Entering the second stage, so long as the remaining slots 
+    second algorithm is more complicated. Entering the second stage, so long as the remaining slots
     are > the number of species, there can be at most one species that would exceed the half population
     limit by receiving an equal share of remaining slots. So to fix this problem, start by finding this
     species (if it exists) giving it exactly as many slots as it can have, then removing it from the
@@ -152,7 +152,7 @@ deathmatch.contest = (function() {
         speciesNext.push( breedRandomly(a,speciesChooser,rates) );
       }
       harem = Math.ceil(harem/2);
-    } 
+    }
     return speciesNext;
   }
   function nextGeneration( generationSummary, simulation ) {
@@ -220,7 +220,7 @@ deathmatch.contest = (function() {
     - Constraint: No organism with the same species parent may be paired.
     - Constraint: No organism may be paired more than once.
     - 2*matchCount organisms are moved into the opponent list starting from the begining of the population.
-    -   We keep a count for each species parent encountered. 
+    -   We keep a count for each species parent encountered.
     -   If the count is = matchCount any organisms with that species parent will be skipped.
     - The first pair is created from the first organism in opponent list and the last compatible organism.
     -   These are removed from the opponent list.
@@ -314,7 +314,7 @@ deathmatch.contest = (function() {
       }
     } else if ( rightParts > MAXIMUM_PARTS ) {
       match.leftCreature.wins++;
-      match.result = 'LEFT BY PARTS DQ';      
+      match.result = 'LEFT BY PARTS DQ';
     }
 
     return match;
@@ -347,7 +347,7 @@ deathmatch.contest = (function() {
     if ( match.leftStats.immobileIterations >= simulation.TKO_ITERATIONS )
       return updateMatchStats(match, "RIGHT TKO", false, true, simulation );
 
-    if ( match.leftStats.immobileIterations >= simulation.BOTH_IMMOBILE_ITERATIONS 
+    if ( match.leftStats.immobileIterations >= simulation.BOTH_IMMOBILE_ITERATIONS
        && match.rightStats.immobileIterations >= simulation.BOTH_IMMOBILE_ITERATIONS )
       return updateMatchStats(match, "BOTH IMMOBILE", false, false, simulation );
 
@@ -363,7 +363,7 @@ deathmatch.contest = (function() {
 
       return updateMatchStats(match, "DRAW", false, false, simulation );
     }
-    return true;    
+    return true;
   }
 
   function matchSummary(match) {
@@ -371,7 +371,7 @@ deathmatch.contest = (function() {
       floorSlope: match.floorSlope,
       result: match.result,
       iterations: match.iterations,
-      left: { 
+      left: {
         index: match.leftOrganism.index,
         winner: match.leftStats.winner,
         health: match.leftStats.health
@@ -394,7 +394,7 @@ deathmatch.contest = (function() {
     if (rightWinner) {
       match.rightOrganism.wins++;
       match.rightOrganism.score += simulation.WIN_BONUS;
-      match.rightStats.winner = true;      
+      match.rightStats.winner = true;
     }
     return updateScores(match);
   }
@@ -467,9 +467,9 @@ deathmatch.contest = (function() {
         }
       },
       PreSolve: function() {},
-      PostSolve: function(contact, impulse) { 
+      PostSolve: function(contact, impulse) {
         if ( ! contact.m_fixtureA.m_body.id || ! contact.m_fixtureB.m_body.id ) return;
-        applyDamage(contact,impulse) 
+        applyDamage(contact,impulse)
       }
     });
   }
@@ -552,7 +552,7 @@ deathmatch.contest = (function() {
         stats.immobileIterations = 0;
         stats.lastPosition = {x:creature.origin.x, y:creature.origin.y};
       } else {
-        stats.immobileIterations++;        
+        stats.immobileIterations++;
       }
     }
   }
@@ -593,7 +593,7 @@ deathmatch.contest = (function() {
     match.junk[part.body.id] = part;
     part.health.integrity = 1;
 
-    if (part.parent) { 
+    if (part.parent) {
       match.world.DestroyJoint( part.attachment );
       part.attachment = null;
       delete part.parent.children[part.index];
@@ -696,4 +696,3 @@ deathmatch.contest = (function() {
     pairOpponents : pairOpponents
   }
 })();
-

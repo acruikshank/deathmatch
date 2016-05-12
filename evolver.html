@@ -1,0 +1,134 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Evolver</title>
+  <style type="text/css">
+      body {
+        font-family:Andale Mono,Helvetica,Arial,sans-serif;
+        font-size:.83em;
+        background-color: #333;
+        color:#ccc;
+        width:100%;
+        margin:0;
+      }
+      #display {
+        display: block;
+        margin: 1% 1%;
+        width: 98%;
+        height: 98%;
+      }
+  </style>
+</head>
+<body>
+  <canvas id="display" width="1600" height="1000"></canvas>
+</body>
+  <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-v1.js" charset="utf-8"></script>
+  <script type="text/javascript" src="deathmatch-render-v1.js" charset="utf-8"></script>
+  <script language="javascript">
+
+  var POPULATION_DEFAULTS = {
+    POPULATION_SIZE : 128,
+    SPECIES_SIZE : 22
+  }
+  var match, runInterval, matchTimeout, simulation, worker;
+
+  function el(id) { return document.getElementById(id); }
+  function extend() {
+    var o = {};
+    for (var i=0,l=arguments.length; i<l; i++)
+      for ( var key in arguments[i] )
+        o[key] = arguments[i][key];
+    return o;
+  }
+
+  function init() {
+    worker = new Worker('evolve-worker.js')
+    worker.onmessage = handleWorkerMessage;
+
+    simulation = extend( {index:1}, deathmatch.creature.DEFAULT_RATES, deathmatch.contest.DEFAULT_MATCH_PARAMETERS, POPULATION_DEFAULTS );
+
+    worker.postMessage({type:'start', args:[simulation]})
+    worker.postMessage({type:'population'})
+    delayThenReplay();
+  }
+
+  function delayThenReplay() {
+    setTimeout(function() { worker.postMessage({type:'replay'}) }, 1000);
+  }
+
+  function handleWorkerMessage(e) {
+    ({
+      replay: startMatch,
+      population: handlePopulation
+    }[e.data.type] || function() {}).apply(this, e.data.args || [])
+  }
+
+  function handlePopulation(population) {
+    deathmatch.render.initSpeciesColors(population);
+
+  }
+
+  function startMatch(replay) {
+    if (replay == null)
+      return delayThenReplay();
+
+    match = deathmatch.contest.startMatch( replay.left, replay.right, replay.floorSlope );
+    if ( match.result )
+      return matchComplete();
+
+    play();
+  }
+
+  function play() {
+    runInterval = setInterval(function(){
+      updateMatch();
+    }, 1000/60 );
+  }
+
+  function updateMatch() {
+    if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
+      clearInterval(runInterval);
+      runInterval = null;
+      return matchComplete();
+    }
+
+    var ctx = el('display').getContext('2d');
+    deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor);
+  }
+
+  function renderCreature( ctx, genome ) {
+    var s = deathmatch.contest.PIXELS_PER_METER;
+    var transform = new deathmatch.creature.T().translate( ctx.canvas.width*s/2, ctx.canvas.width*s/2 );
+    var creature = deathmatch.creature.generate( genome, transform, true, s );
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,80,120,.2)';
+    ctx.lineWidth = 20;
+    ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    deathmatch.render.renderToFit( creature, ctx );
+    ctx.restore();
+  }
+
+  function matchComplete() {
+    var ctx = el('display').getContext('2d');
+
+    var ctx = el('display').getContext('2d');
+    ctx.font = 'bold 35px Andale Mono,Helvetica';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.fillText(match.result, 400, 80);
+
+    delayThenReplay();
+  }
+
+  var ctx = el('display').getContext('2d');
+  ctx.scale(2,2);
+
+  init();
+</script>
+</html>

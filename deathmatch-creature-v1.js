@@ -3,10 +3,10 @@
     organism: An organism is a genome plus information about genome's performance and
             lineage. Organism's will compete in matches througout a generation and then
             be bred to produce the next generation.
-    genome: An organism's genetic material. The genome is the basic plan for a creature. 
+    genome: An organism's genetic material. The genome is the basic plan for a creature.
             It persists for an entire generation, then parts of it are passed on to the
             organism's children.
-    creature: The body of an organism. A creature will be generated from the organism's 
+    creature: The body of an organism. A creature will be generated from the organism's
             genome for each match. The creature contains the geometry and physics of the
             organism as well as damage received during the course of a match. A creature
             may be said to be the genome's phenotype.
@@ -18,15 +18,15 @@
             matches against each other. Species may sub-divide to produce new species.
             Species span generations.
  */
-deathmatch = window.deathmatch || {};
+deathmatch = this.deathmatch || {};
 deathmatch.creature = (function() {
   var MASS = 100;
   var MIN_PART_MASS = .51;
   var MAX_OBLIQUE = 5;
   var DENSITY = .01;
   var TRAITS = ['tak','giv','obl','ext','ang','flx'];
-	
-  var DEFAULT_RATES = { 
+
+  var DEFAULT_RATES = {
     MUTATION_NEARNESS : .04,  // smaller number means smaller chance of big mutations
     GENERAL_MUTATION_RATE : .2,
     TRAIT_SNP : 1,
@@ -41,8 +41,8 @@ deathmatch.creature = (function() {
 
   var ta = {};
   ta.project=  function(p,t) { return {x:t.a*p.x+t.c*p.y+t.e, y:t.b*p.x+t.d*p.y+t.f}; };
-  ta.multiply=function(t2,t1){ return {a:t1.a*t2.a+t1.b*t2.c, c:t1.c*t2.a+t1.d*t2.c, 
-                                       b:t1.a*t2.b+t1.b*t2.d, d:t1.c*t2.b+t1.d*t2.d, 
+  ta.multiply=function(t2,t1){ return {a:t1.a*t2.a+t1.b*t2.c, c:t1.c*t2.a+t1.d*t2.c,
+                                       b:t1.a*t2.b+t1.b*t2.d, d:t1.c*t2.b+t1.d*t2.d,
                                        e:t1.e*t2.a+t1.f*t2.c+t2.e, f:t1.e*t2.b+t1.f*t2.d+t2.f}; };
   ta.translate=function(x,y) { return {a:1,b:0,c:0,d:1,e:x,f:y}; };
   ta.rotate= function(theta) { return {a:Math.cos(theta), b:Math.sin(theta),
@@ -56,7 +56,7 @@ deathmatch.creature = (function() {
   ta.apply=  function(ctx,t) { ctx.setTransform(t.a,t.b,t.c,t.d,t.e,t.f); }
 
   function T(transform) { this.t = transform || ta.ident(), public={}; }
-  T.prototype = { 
+  T.prototype = {
     project:function(p) {return ta.project(p,this.t);},
     clone:function() { return new T(ta.clone(this.t)); },
     inverse:function() { return new T(ta.inverse(this.t)); },
@@ -134,7 +134,7 @@ deathmatch.creature = (function() {
 
         var half_angle = Math.PI / type.chd.length;
         var work_transform = part.transform.clone().scale(1/obl,obl);
-        var point = work_transform.project({x:part.r,y:0}), 
+        var point = work_transform.project({x:part.r,y:0}),
             dx = point.x-part.origin.x, dy = point.y-part.origin.y;
         part.theta = Math.atan2(dy,dx);
         work_transform.rotate(Math.PI+half_angle);
@@ -144,7 +144,7 @@ deathmatch.creature = (function() {
           var child_type = genome[type.chd[index]];
           if ( child_type && child_masses[index] ) {
 
-            point = work_transform.project({x:part.r/PIXELS_PER_METER,y:0}); 
+            point = work_transform.project({x:part.r/PIXELS_PER_METER,y:0});
             dx = point.x-part.origin.x; dy = point.y-part.origin.y;
             var child_transform = part.transform.clone().rotate(
               Math.atan2(dy,dx)-part.theta).translate(0,Math.sqrt(dx*dx+dy*dy));
@@ -241,9 +241,9 @@ deathmatch.creature = (function() {
   function breedOrganisms( organism1, organism2, rates, stats ) {
     if ( organism1.species.id != organism2.species.id )
       throw new Error( "attempt to breed organisms of different species" );
-    return { 
-      species:organism1.species, 
-      genome:recombine( organism1.genome, organism2.genome, rates, stats ), 
+    return {
+      species:organism1.species,
+      genome:recombine( organism1.genome, organism2.genome, rates, stats ),
       generation: Math.max(organism1.generation, organism2.generation) + 1
     }
   }
@@ -280,7 +280,7 @@ deathmatch.creature = (function() {
 
   function coinFlip() { return Math.random() < .5; }
   function randInt() { return (2*Math.random()-1)*(1<<32); }
-  function randId() { var id=[],c='abcdefghijklmnopqrstuvwxyz0123456789A'.split(''); 
+  function randId() { var id=[],c='abcdefghijklmnopqrstuvwxyz0123456789A'.split('');
                       for (var i=0;i<15; i++) id.push(randItem(c)); return id.join('') }
   function randIndex(ar) { return (Math.random() * ar.length)|0; }
   function randItem(ar) { return ar[randIndex(ar)]; }
@@ -304,14 +304,14 @@ deathmatch.creature = (function() {
    inv = d - B*tan((A*C + x) / A)
    */
   function randomMutation( currentValue, nearness ) {
-    var B = Math.sqrt(nearness), C = Math.atan(currentValue/B), 
+    var B = Math.sqrt(nearness), C = Math.atan(currentValue/B),
         N=-1/(B*(Math.atan((currentValue-1)/B) - C)), A = -N*B;
     return currentValue - B * Math.tan( (A * C + Math.random()) / A);
   }
 
-  function cloneChromosome(c) { 
+  function cloneChromosome(c) {
     var clone = {};
-    for (var trait in c) 
+    for (var trait in c)
       clone[trait] = (trait == 'chd' ? c.chd.slice(0) : c[trait]);
     return clone;
   }
@@ -325,7 +325,7 @@ deathmatch.creature = (function() {
     while generating offspring distributed over the genotypical space constrained by
     the total genetic variation in the population.
   SNP's are a mutation of a single genetic component in a random direction. SNP's introduce
-    genetic variation into the population. Since SNP's aren't inherited from the prior 
+    genetic variation into the population. Since SNP's aren't inherited from the prior
     generation and aren't influenced by the fitness of the parent, they should be rare.
     The mutation rate will affect the rate of evolution and the ultimate fitness of the
     creatures.
@@ -333,8 +333,8 @@ deathmatch.creature = (function() {
     in a section of a parents chromosome will be interpreted as the component before it
     in the child). Errors also include duplications and deletions of whole chromosomes.
     Transcription errors should usually be fatal to the child, but they provide the
-    potential to jump to different areas of morphological space. Duplications have the 
-    potential to add non-functioning genetic material that may later evolve into 
+    potential to jump to different areas of morphological space. Duplications have the
+    potential to add non-functioning genetic material that may later evolve into
     advantageous structures. Deletions have the potential to remove unnecessary genetic
     material that creates a more stable genetic population.
 
@@ -353,16 +353,16 @@ deathmatch.creature = (function() {
     child. There will be no recombination for these chromosomes, but SNPs, duplications
     and deletions will apply.
   */
-  function statAdd( stats, property, n ) { 
-    if (!stats) return; 
-    stats[property] = (stats[property]||0)+n; 
+  function statAdd( stats, property, n ) {
+    if (!stats) return;
+    stats[property] = (stats[property]||0)+n;
     stats['is_'+property] = true;
   }
-  function setStatFlags( stats ) { 
-    if (!stats) return; 
+  function setStatFlags( stats ) {
+    if (!stats) return;
     for (var key in stats) if (key.match(/^is_/) && stats[key]) {
       var has = 'has_'+key.substring(3);
-      stats[has] = (stats[has] || 0) + stats[key]; 
+      stats[has] = (stats[has] || 0) + stats[key];
       delete stats[key];
     }
   }
@@ -398,8 +398,8 @@ deathmatch.creature = (function() {
     stats = stats || {};
     rates = rates || DEFAULT_RATES;
     statAdd(stats, 'recombinations', 1);
-    var child = [], 
-        min = Math.min(parent1.length,parent2.length), 
+    var child = [],
+        min = Math.min(parent1.length,parent2.length),
         max = Math.max(parent1.length,parent2.length);
     for ( var i=0; i < min; i++ ) {
       var first = coinFlip();
@@ -426,11 +426,11 @@ deathmatch.creature = (function() {
           cloner[TRAITS[j]] = donor[TRAITS[donorShift+j]];
           statAdd(stats, 'donor_traits', 1)
         }
-      }        
+      }
 
       // child indices
       ti1 = randIndex(donor.chd); ti2 = randIndex(donor.chd);
-      start = Math.min(ti1,ti2); 
+      start = Math.min(ti1,ti2);
       end = Math.max(ti1,ti2);
       statAdd(stats,'children',cloner.chd.length);
 

@@ -5,7 +5,7 @@ deathmatch.render = (function() {
   var MATCH_BACKGROUND_HARD = 'rgb(40,40,40)';
 
   function eachChild( part, f, arg1, arg2 ) {
-    if (part.children) 
+    if (part.children)
       for ( var i=0,child,l=part.children.length; child = part.children[i], i<l; i++ )
         if (child) f( child, arg1, arg2 );
   }
@@ -74,7 +74,7 @@ deathmatch.render = (function() {
     junkGradient[age] = interpColor( lastColor[0], color[0], scaled / color[1] );
     scaled += .35;
     if (scaled > color[1]) {
-      scaled -= color[1]; lastColor = color; color = junkGradientColors[++i]; 
+      scaled -= color[1]; lastColor = color; color = junkGradientColors[++i];
     }
   }
   junkGradient.push( interpColor(lastColor[0], lastColor[0], 0) );
@@ -105,7 +105,7 @@ deathmatch.render = (function() {
 
     ctx.save();
     ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = 2*s;
+    ctx.lineWidth = 1*s;
     ctx.translate( part.origin.x, part.origin.y );
     ctx.rotate( part.theta );
     ctx.scale( part.oblong, 1 / part.oblong );
@@ -201,12 +201,12 @@ deathmatch.render = (function() {
     var s = deathmatch.contest.PIXELS_PER_METER;
     ctx.save();
     ctx.scale( 1/s, 1/s );
-    ctx.lineWidth = 2*s;
+    ctx.lineWidth = s;
     ctx.beginPath();
     ctx.arc( creature.origin.x, creature.origin.y, 5*s, 0, 2*Math.PI, true );
     ctx.fillStyle = speciesColors[organism.species.id] || '#fff';
     ctx.fill();
-    ctx.strokeStyle = 'rgb(40,40,40)'; 
+    ctx.strokeStyle = 'rgb(40,40,40)';
     ctx.stroke();
     ctx.restore();
 
@@ -229,10 +229,10 @@ deathmatch.render = (function() {
 
     if ( ! match.rightCreature.junk )
       render( match.rightCreature, match, ctx );
-    if ( ! match.leftCreature.junk ) 
+    if ( ! match.leftCreature.junk )
       render( match.leftCreature, match, ctx );
 
-    if ( ! match.leftCreature.junk ) 
+    if ( ! match.leftCreature.junk )
       drawDamage( match.leftCreature, match.leftOrganism, ctx, true );
     if ( ! match.rightCreature.junk )
       drawDamage( match.rightCreature, match.rightOrganism, ctx, false );
@@ -241,7 +241,7 @@ deathmatch.render = (function() {
     ctx.strokeStyle = 'rgba(0,0,0,.8)';
     ctx.lineWidth = 1;
     renderCage(ctx, match);
-    ctx.restore();    
+    ctx.restore();
   }
 
   return {
