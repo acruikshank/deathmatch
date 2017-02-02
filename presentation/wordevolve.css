@@ -57,19 +57,19 @@
     }
 
     #wordevolve svg path {
-      fill: #666;
+      fill: #777;
     }
 
     #wordevolve svg text.solution {
       fill: #777;
-      font-size: 13px;
+      font-size: 15px;
       text-anchor: middle;
       letter-spacing: .15em;
     }
 
     #wordevolve svg text.label {
       fill: #666;
-      font-size: 13px;
+      font-size: 15px;
       font-weight: bold;
       letter-spacing: 0;
     }

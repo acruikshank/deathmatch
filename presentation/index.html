@@ -3,7 +3,7 @@
   <title>Box2d Deathmatch Presentation</title>
   <style>
     body {
-      background-color: rgb(40,40,40);
+      background-color: rgb(20,20,20);
       margin: 0;
       padding: 0;
       font-family: Andale Mono, Courier;
@@ -22,6 +22,10 @@
      top: 0;
      color: #eee;
      overflow: hidden;
+   }
+
+   .slide.light {
+     color: #000;
    }
 
   .slide.transition, .sub-slide.transition {
@@ -50,10 +54,31 @@
     width: 1000px;
   }
 
+  .slide img.background {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1003px;
+    height: auto;
+    -webkit-transform: translate(-50%, 0);
+    -moz-transform: translate(-50%, 0);
+    transform: translate(-50%, 0);
+  }
+
   .slide img {
     display: block;
     height: 50%;
     margin: 0 auto;
+    z-index: 0;
+    position: relative;
+  }
+
+  .slide img.vcenter {
+    margin-top: 15%;
+  }
+
+  .slide img.left {
+    margin-left: 10%;
   }
 
   .slide label.caption {
@@ -61,7 +86,7 @@
     text-align: center;
     font-size: 24px;
     font-weight: normal;
-    margin-top: 40px;    
+    margin-top: 40px;
   }
 
   .slide .center {
@@ -81,6 +106,7 @@
     position: absolute;
     left: 0;
     bottom: 0;
+    text-shadow: 0 0 4px #000;
   }
 
   .sub-slide h3 {
@@ -88,20 +114,32 @@
     font-size: 30px;
     font-weight: normal;
     margin: 60px 0 60px;
-    color: #ccc;    
+    color: #ccc;
   }
 
   .title-screen {
     position: absolute;
-    right: 80px;
-    bottom: 80px;
+    top: 84px;
+    left: 50%;
+    width: 933px;
+    height: auto;
+    -webkit-transform: translate(-50%, 0);
+    -moz-transform: translate(-50%, 0);
+    transform: translate(-50%, 0);
   }
 
   .title-screen h1 {
-    font-size: 80px;
+    font-size: 60px;
     font-weight: normal;
     text-align: right;
-    margin: 80px 0 70px;
+    margin: 160px 0 10px;
+  }
+
+  .title-screen img.title {
+    position: absolute;
+    top: 63%;
+    transform: translate(0,-50%);
+    left: 6%;
   }
 
   h2.by_line {
@@ -110,7 +148,7 @@
     font-weight: normal;
     margin: 0;
     padding:0;
-    line-height: 80px;
+    line-height: 60px;
     text-align: right;
   }
   </style>
@@ -128,7 +166,8 @@
 <body>
   <div class="slide">
     <div class="title-screen">
-      <h1>Box2d Deathmatch</h1>
+      <img src="carbon_five.png" class="title"/>
+      <h1>Deathmatch</h1>
       <h2 class="by_line">Alex Cruikshank</h2>
       <h2 class="by_line">acruikshank@github</h2>
       <h2 class="by_line">@sivoh</h2>
@@ -151,8 +190,8 @@
       <svg class="solutions">
         <defs>
           <linearGradient id="SoftEdge" gradientTransform="rotate(90 0 0)">
-            <stop offset="5%" stop-color="rgb(40,40,40)" stop-opacity="1"/>
-            <stop offset="95%" stop-color="rgb(40,40,40)"  stop-opacity="0"/>
+            <stop offset="5%" stop-color="rgb(20,20,20)" stop-opacity="1"/>
+            <stop offset="95%" stop-color="rgb(20,20,20)"  stop-opacity="0"/>
           </linearGradient>
         </defs>
         <rect class="solutions-top" fill="url(#SoftEdge)" x="0" y="0" width="1160" height="400"/>
@@ -184,10 +223,22 @@
       <h3>chromoton</h3>
     </div>
     <div class="sub-slide">
-      <h3>genes code pigments</h3>
+      <h3>24 5 bit genes</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>2 bits determine color</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>3 bit multiplier</h3>
     </div>
     <div class="sub-slide">
       <h3>sexual reproduction</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>genetic parallel processing</h3>
+    </div>
+    <div class="sub-slide">
+      <h3>genetic data storage</h3>
     </div>
     <div class="sub-slide">
       <h3>speciation</h3>
@@ -206,7 +257,7 @@
 
   <div class="slide">
     <h2 class="head">Ryan North</h2>
-    <img src="boxcar2d.png"/>
+    <img src="boxcar2d_inverse.png"/>
     <label class="caption">BoxCar2D</label>
   </div>
 
@@ -281,12 +332,15 @@
   </div>
 
   <div class="slide bulleted">
-    <h2 class="head">Future work</h2>
+    <h2 class="head">Dr. Adrian Thompson</h2>
     <ul class='hidden-points'>
-      <li>Parameter tuning</li>
-      <li>Data analysis</li>
-      <li>Online simultaneous simulation</li>
+      <li>Evolved FPGAs</li>
+      <li>Train to detect difference between 10kHz and 100Hz tone</li>
     </ul>
+  </div>
+
+  <div class="slide">
+    <h2 class="center">Chloroblasts and Magnetometers</h2>
   </div>
 
   <div class="slide">
@@ -332,6 +386,8 @@
       arrangeSlides( subslides, 0 );
     }
 
+    window.onresize = function() { arrangeSlides(slides, slideIndex) };
+
     function arrangeSlides( slides, index, autoHeight ) {
       for (var i=0, slide; slide = slides[i]; i++) {
         slide.style.width = document.body.offsetWidth + 'px';
@@ -341,9 +397,9 @@
           slide.style.left = document.body.offsetWidth + 'px';
         else if ( i < index )
           slide.style.left = -slide.offsetWidth + 'px';
-        else 
+        else
           slide.style.left = '0px';
-      }      
+      }
     }
 
     function transition( oldSlide, newSlide, direction, adjustHeight ) {
@@ -355,10 +411,10 @@
       newSlide.style.left = direction * windowWidth + 'px';
       addClass( newSlide, 'transition' );
       addClass( oldSlide, 'transition' );
-      
-      setTimeout(function() { 
-        newSlide.style.left = '0px'; 
-        oldSlide.style.left = -direction * oldSlide.offsetWidth + 'px' 
+
+      setTimeout(function() {
+        newSlide.style.left = '0px';
+        oldSlide.style.left = -direction * oldSlide.offsetWidth + 'px'
       }, 1);
       return newSlide;
     }
