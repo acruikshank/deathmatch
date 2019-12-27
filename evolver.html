@@ -69,7 +69,7 @@
   }
 
   function delayThenReplay() {
-    safeTimeout(function() { worker.postMessage({type:'replay'}) }, 5000);
+    safeTimeout(function() { worker.postMessage({type:'replay'}) }, 1000);
   }
 
   function handleWorkerMessage(e) {
@@ -96,33 +96,13 @@
   }
 
   function play() {
-    runInterval = setInterval(function(){
-      updateMatch();
-    }, 1000/60 );
-  }
-
-  function updateMatch() {
-    if ( ! deathmatch.contest.updateMatch( match, simulation ) ) {
-      clearInterval(runInterval);
-      runInterval = null;
+    if ( ! deathmatch.contest.updateMatch( match, simulation ) )
       return matchComplete();
-    }
 
     var ctx = el('display').getContext('2d');
     deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor);
-  }
 
-  function renderCreature( ctx, genome ) {
-    var s = deathmatch.contest.PIXELS_PER_METER;
-    var transform = new deathmatch.creature.T().translate( ctx.canvas.width*s/2, ctx.canvas.width*s/2 );
-    var creature = deathmatch.creature.generate( genome, transform, true, s );
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,80,120,.2)';
-    ctx.lineWidth = 20;
-    ctx.strokeStyle = 'rgba(0,0,0,.8)';
-    deathmatch.render.renderToFit( creature, ctx );
-    ctx.restore();
+    requestAnimationFrame(play);
   }
 
   function matchComplete() {
