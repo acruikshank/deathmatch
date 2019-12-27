@@ -56,8 +56,20 @@
     delayThenReplay();
   }
 
+  function safeTimeout(f, delay) {
+    const start = new Date().getTime()
+    function loop() {
+      const t = new Date().getTime()
+      if (t - start < delay)
+        requestAnimationFrame(loop)
+      else
+        f()
+    }
+    loop()
+  }
+
   function delayThenReplay() {
-    setTimeout(function() { worker.postMessage({type:'replay'}) }, 1000);
+    safeTimeout(function() { worker.postMessage({type:'replay'}) }, 5000);
   }
 
   function handleWorkerMessage(e) {
