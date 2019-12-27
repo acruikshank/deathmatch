@@ -9,7 +9,7 @@
       body {
         font-family:Andale Mono,Helvetica,Arial,sans-serif;
         font-size:.83em;
-        background-color: #333;
+        background-color: #000;
         color:#ccc;
         width:100%;
         margin:0;
@@ -19,10 +19,21 @@
         margin: 0 auto;
         width: 90%;
       }
+      #result {
+        position: absolute;
+        top: 15%;
+        left: 0;
+        font: bold 50px Andale Mono,Ubuntu Mono,Helvetica;
+        color: rgba(255,255,255,.6);
+        text-align: center;
+        width: 100%;
+        margin: 0;
+      }
   </style>
 </head>
 <body>
   <canvas id="display" width="1600" height="1000"></canvas>
+  <div id="result"></span>
 </body>
   <script type="text/javascript" src="Box2dWeb-2_1_a_3.js" charset="utf-8"></script>
   <script type="text/javascript" src="deathmatch-creature-v1.js" charset="utf-8"></script>
@@ -35,6 +46,9 @@
     SPECIES_SIZE : 22
   }
   var match, runInterval, matchTimeout, simulation, worker;
+
+  var ctx = el('display').getContext('2d');
+  ctx.scale(2,2);
 
   function el(id) { return document.getElementById(id); }
   function extend() {
@@ -85,6 +99,7 @@
   }
 
   function startMatch(replay) {
+    el('result').innerHTML = '';
     if (replay == null)
       return delayThenReplay();
 
@@ -99,26 +114,16 @@
     if ( ! deathmatch.contest.updateMatch( match, simulation ) )
       return matchComplete();
 
-    var ctx = el('display').getContext('2d');
     deathmatch.render.renderCanvas(ctx, match, getComputedStyle(document.body,null).backgroundColor);
 
     requestAnimationFrame(play);
   }
 
   function matchComplete() {
-    var ctx = el('display').getContext('2d');
-
-    var ctx = el('display').getContext('2d');
-    ctx.font = 'bold 35px Andale Mono,Helvetica';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,.6)';
-    ctx.fillText(match.result, 400, 80);
+    el('result').innerHTML = match.result;
 
     delayThenReplay();
   }
-
-  var ctx = el('display').getContext('2d');
-  ctx.scale(2,2);
 
   init();
 </script>

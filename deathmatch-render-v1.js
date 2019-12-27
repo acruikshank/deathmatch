@@ -1,8 +1,9 @@
 deathmatch = window.deathmatch || {};
 deathmatch.render = (function() {
 
-  var MATCH_BACKGROUND = 'rgba(40,40,40,.8)';
-  var MATCH_BACKGROUND_HARD = 'rgb(40,40,40)';
+
+  var MATCH_BACKGROUND = 'rgba(30,30,30,.8)';
+  var MATCH_BACKGROUND_HARD = 'rgb(10,10,10)';
 
   function eachChild( part, f, arg1, arg2 ) {
     if (part.children)
@@ -238,7 +239,7 @@ deathmatch.render = (function() {
       drawDamage( match.rightCreature, match.rightOrganism, ctx, false );
 
     ctx.fillStyle = background;
-    ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    ctx.strokeStyle = 'rgba(200,200,200)';
     ctx.lineWidth = 1;
     renderCage(ctx, match);
     ctx.restore();
