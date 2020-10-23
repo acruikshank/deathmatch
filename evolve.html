@@ -199,7 +199,9 @@
 
     if ( roundSize < 2 ) {
       if ( simulationName && simulationName.length )
-        deathmatch.store.saveGeneration( simulation, generation)
+        if (deathmatch.store != null) {
+          deathmatch.store.saveGeneration( simulation, generation)
+        }
 
       return nextGeneration();
     }
@@ -330,7 +332,9 @@
   function simulationHandler( err, sim, gen ) {
     if ( err ) {
       initializeTournament()
-      deathmatch.store.saveSimulation(simulation);
+      if (deathmatch.store != null) {
+        deathmatch.store.saveSimulation(simulation);
+      }
       return
     }
 
@@ -358,11 +362,13 @@
       }
     }
 
-    if ( simulationName ) {
+    if ( simulationName && deathmatch.store != null) {
       deathmatch.store.loadSimulation(simulationName, simulationHandler);
     } else {
       initializeTournament();
-      deathmatch.store.saveSimulation(simulation);
+      if (deathmatch.store != null) {
+        deathmatch.store.saveSimulation(simulation);
+      }
     }
   }
 
